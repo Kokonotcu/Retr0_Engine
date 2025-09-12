@@ -3,7 +3,7 @@
 int main(int argc, char* argv[])
 {
 
-#ifdef _DEBUG
+#ifdef DEBUG
 	ShaderCompiler::CompileFromDir("shaders/");
 #endif // DEBUG
 

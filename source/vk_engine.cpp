@@ -10,15 +10,13 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_vulkan.h"
 
-
-
 VulkanEngine* loadedEngine = nullptr;
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
  };
 
- #ifdef _DEBUG
+#ifdef DEBUG
     const bool enableValidationLayers = true;
  #else
     const bool enableValidationLayers = false;

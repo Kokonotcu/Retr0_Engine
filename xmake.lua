@@ -1,7 +1,20 @@
 -- xmake.lua — Retr0 Engine (SDL3 vendored on Windows, system on Linux)
 set_project("Retr0 Engine")
 set_languages("c++20")
-add_rules("mode.debug", "mode.release")
+add_rules("mode.release", "mode.debug")
+
+if is_mode("debug") then
+    add_defines("DEBUG", "_DEBUG")
+	set_symbols("debug")
+    set_optimize("none")
+end
+
+if is_mode("release") then
+    set_symbols("hidden")
+    set_strip ("all")
+    set_optimize("fastest")
+end
+
 
 -- Put outputs in a predictable place
 set_targetdir("bin/$(plat)/$(mode)")
@@ -17,9 +30,15 @@ target("retr0_engine")
 
     -- Your sources
     add_includedirs("source", {public = true})
-    add_files("source/**.cpp")
 	
-	add_headerfiles("source/**.h", "source/**.hpp" , { group = "../headers" })
+	-- Define groups (patterns are relative to rootdir)
+	add_filegroups("Source Files", { rootdir = "source", files = {"**.cpp"},           group = "Source Files" })
+	add_filegroups("Header Files", { rootdir = "source", files = {"**.h", "**.hpp"},   group = "Header Files" })
+	
+	-- Add those groups to the target
+	add_files("source/**.cpp",    { group = "Source Files" })
+	add_headerfiles("source/**.h", "source/**.hpp",    { group = "Header Files" })
+	
 
     -- Vendored header-only libs
     add_includedirs(
@@ -48,7 +67,7 @@ target("retr0_engine")
 		"external/fastgltf/src/**.cpp",
 		"source/Utilities/**.cpp"
     )
-	add_headerfiles("source/Utilities/**.h", "source/Utilities/**.hpp" , { group = "../headers" })
+	add_headerfiles("source/Utilities/**.h", "source/Utilities/**.hpp")
 
     -- -------------------- Linux --------------------
     if is_plat("linux") then
@@ -77,9 +96,12 @@ target("retr0_engine")
 
     -- -------------------- Windows (MSVC, vendored SDL) --------------------
     if is_plat("windows") then
+	
         set_toolchains("msvc")
         add_cxflags("/MP")
         add_ldflags("/DEBUG")
+		
+
 
         -- Vulkan via LunarG SDK (headers + import lib)
         local vksdk = os.getenv("VULKAN_SDK")
