@@ -1,0 +1,30 @@
+# Ignore everything by default
+*
+
+# Allow directory traversal so we can unignore specific paths/files
+!*/
+
+# Keep these project folders
+!/source/**
+!/external/**
+!/externals/**
+!/shaders/**
+!/assets/**
+
+# Keep all DLLs anywhere (e.g., in bin/, root, etc.)
+#!*.dll
+#!**/*.dll
+#
+
+# (Optional) If you also want to keep Linux shared libs, uncomment:
+!*.so
+!**/*.so
+
+# (Optional) If you want xmake config tracked, uncomment:
+!/xmake.lua
+
+!*.bat
+!**/*.bat
+
+# Do not ignore self
+!**.gitignore
