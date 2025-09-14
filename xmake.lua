@@ -71,27 +71,49 @@ target("retr0_engine")
 
     -- -------------------- Linux --------------------
     if is_plat("linux") then
-		add_syslinks("pthread", "dl")
-		add_ldflags("-fuse-ld=lld", {tools = {"cc", "cxx", "ld"}, force = false})
+    -- pthread/dl and (optionally) the LLD linker
+    	add_syslinks("pthread", "dl")
+    	add_ldflags("-fuse-ld=lld", {tools = {"cc", "cxx", "ld"}, force = false})
 
-		-- Use system libs via pkg-config (declared at root)
-		if has_package("pkgconfig::sdl3") then
-			add_packages("pkgconfig::sdl3")
-		else
-			raise("libsdl3-dev not found (pkg-config sdl3). Install it.")
-		end
-		if has_package("pkgconfig::vulkan") then
-			add_packages("pkgconfig::vulkan")
-		else
-			raise("Vulkan dev packages not found (pkg-config vulkan).")
-		end
-		if has_package("pkgconfig::shaderc") then
-			add_packages("pkgconfig::shaderc") -- optional
-		end
-	
-		-- If you drop .so next to the binary, loader will find them
-		add_rpathdirs("$ORIGIN")
-	end
+    -- use system packages via pkg-config (declared at root)
+    	if has_package("pkgconfig::sdl3") then
+        	add_packages("pkgconfig::sdl3")
+    	else
+        	print(false, "libsdl3-dev not found (pkg-config sdl3). Install it.")
+    	end
+    	if has_package("pkgconfig::vulkan") then
+        	add_packages("pkgconfig::vulkan")
+    	else
+        	print(false, "libvulkan-dev not found (pkg-config vulkan). Install it.")
+    	end
+    	if has_package("pkgconfig::shaderc") then
+ 		add_packages("pkgconfig::shaderc") -- optional
+    	end
+
+    -- loader looks next to the binary for .so files you place there
+    	add_rpathdirs("$ORIGIN")
+
+    -- After build, copy runtime content beside the binary
+    	after_build(function (t)
+        	local out = t:targetdir()
+
+        -- copy your data folders (creates out/assets and out/shaders)
+        	os.trycp(path.join(os.projectdir(), "assets"),  out)
+        	os.trycp(path.join(os.projectdir(), "shaders"), out)
+
+        -- OPTIONAL: if you want to bundle system .so next to the exe, uncomment:
+        -- local function pkgvar(pkg, var)
+        --     local ok, val = pcall(function()
+        --         return (os.iorunv("pkg-config", {"--variable=" .. var, pkg})):trim()
+        --     end)
+        --     if ok and val and #val > 0 then return val end
+        -- end
+        -- local sdl_libdir = pkgvar("sdl3", "libdir")
+        -- if sdl_libdir then os.trycp(path.join(sdl_libdir, "libSDL3*.so*"), out) end
+        -- local sh_libdir = pkgvar("shaderc", "libdir")
+        -- if sh_libdir then os.trycp(path.join(sh_libdir, "libshaderc*.so*"), out) end
+    	end)
+    end
 
 
     -- -------------------- Windows (MSVC, vendored SDL) --------------------

@@ -96,7 +96,7 @@ namespace ShaderCompiler
 
 	}
 
-	void ShaderCompiler::CompileFromDir(std::string dir) 
+	void CompileFromDir(std::string dir) 
 	{
 		try
 		{
