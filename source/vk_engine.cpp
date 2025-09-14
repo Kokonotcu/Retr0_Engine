@@ -193,6 +193,14 @@ void VulkanEngine::InitSwapchain(bool VsyncEnabled)
 
     swapchainDestroy.addImageView(drawImage.imageView);
     swapchainDestroy.addImage(drawImage.image, drawImage.allocation);
+
+    imagePresentSemaphores.resize(swapchainImages.size());
+    VkSemaphoreCreateInfo semInfo = vkinit::semaphore_create_info();
+    for (size_t i = 0; i < imagePresentSemaphores.size(); ++i) 
+    {
+        VK_CHECK(vkCreateSemaphore(device, &semInfo, nullptr, &imagePresentSemaphores[i]));
+        swapchainDestroy.addSemaphore(imagePresentSemaphores[i]);
+    }
 }
 
 void VulkanEngine::CreateSwapchain(uint32_t width, uint32_t height, bool Vsync = true)
@@ -276,11 +284,11 @@ void VulkanEngine::InitSyncStructures()
         VK_CHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &frames[i].renderFence));
 
         VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frames[i].swapchainSemaphore));
-        VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frames[i].renderSemaphore));
+        //VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frames[i].renderSemaphore));
 
 		mainDeletionQueue.addFence(frames[i].renderFence);
 		mainDeletionQueue.addSemaphore(frames[i].swapchainSemaphore);
-		mainDeletionQueue.addSemaphore(frames[i].renderSemaphore);
+		//mainDeletionQueue.addSemaphore(frames[i].renderSemaphore);
     }
 }
 
@@ -485,13 +493,15 @@ void VulkanEngine::Draw()
     //finalize the command buffer (we can no longer add commands, but it can now be executed)
     VK_CHECK(vkEndCommandBuffer(cmd));
 
+    VkSemaphore presentSignal = imagePresentSemaphores[swapchainImageIndex];
+
     //prepare the submission to the queue. 
     //we want to wait on the _presentSemaphore, as that semaphore is signaled when the swapchain is ready
     //we will signal the _renderSemaphore, to signal that rendering has finished
     VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
 
     VkSemaphoreSubmitInfo waitInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, get_current_frame().swapchainSemaphore);
-    VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, get_current_frame().renderSemaphore);
+    VkSemaphoreSubmitInfo signalInfo = vkinit::semaphore_submit_info(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, presentSignal);
 
     VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, &signalInfo, &waitInfo);
 
@@ -508,10 +518,8 @@ void VulkanEngine::Draw()
     presentInfo.pNext = nullptr;
     presentInfo.pSwapchains = &swapchain;
     presentInfo.swapchainCount = 1;
-
-    presentInfo.pWaitSemaphores = &get_current_frame().renderSemaphore;
+    presentInfo.pWaitSemaphores = &presentSignal;
     presentInfo.waitSemaphoreCount = 1;
-
     presentInfo.pImageIndices = &swapchainImageIndex;
 
     VK_CHECK(vkQueuePresentKHR(graphicsQueue, &presentInfo));

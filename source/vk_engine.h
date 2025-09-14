@@ -19,7 +19,7 @@ struct FrameData
 	VkCommandPool commandPool;
 	VkCommandBuffer mainCommandBuffer;
 
-	VkSemaphore swapchainSemaphore, renderSemaphore;
+	VkSemaphore swapchainSemaphore;
 	VkFence renderFence;
 
 	DeletionQueue deletionQueue;
@@ -77,12 +77,18 @@ private:
 	void DrawBackground(VkCommandBuffer cmd);
 
 public:
+	struct SDL_Window* window{ nullptr };
 
 	VkInstance instance;// Vulkan library handle
 	VkDebugUtilsMessengerEXT debugMessenger;// Vulkan debug output handle
 
 	VkPhysicalDevice chosenGPU;// GPU chosen as the default device
 	VkDevice device; // Vulkan device for commands
+
+	VkQueue graphicsQueue;
+	uint32_t graphicsQueueIndex;
+
+	VmaAllocator allocator;
 
 	VkSurfaceKHR surface;// Vulkan window surface
 	VkExtent2D windowExtent{ 800 ,600 };
@@ -94,16 +100,9 @@ public:
 	std::vector<VkImageView> swapchainImageViews;
 	VkExtent2D swapchainExtent;
 
-	struct SDL_Window* window{ nullptr };
-
 	bool isInitialized{ false };
 	int frameNumber{ 0 };
 	bool stopRendering{ false };
-
-	VkQueue graphicsQueue;
-	uint32_t graphicsQueueIndex;
-
-	VmaAllocator allocator;
 
 	AllocatedImage drawImage;
 	VkExtent2D drawExtent;
@@ -115,6 +114,8 @@ public:
 
 	VkPipeline gradientPipeline;
 	VkPipelineLayout gradientPipelineLayout;		 //Imgui stuff
+
+	std::vector<VkSemaphore> imagePresentSemaphores;
 
 private:
 
