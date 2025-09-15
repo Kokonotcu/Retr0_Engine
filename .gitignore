@@ -5,11 +5,11 @@
 !*/
 
 # Keep these project folders
-!/source/**
-!/external/**
-!/externals/**
-!/shaders/**
-!/assets/**
+!/[Ss]ource/**
+!/[Ee]xternal/**
+!/[Ee]xternals/**
+!/[Ss]haders/**
+!/[Aa]ssets/**
 
 # Keep all DLLs anywhere (e.g., in bin/, root, etc.)
 #!*.dll
