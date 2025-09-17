@@ -21,8 +21,6 @@ struct FrameData
 
 	VkSemaphore swapchainSemaphore;
 	VkFence renderFence;
-
-	DeletionQueue deletionQueue;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -49,6 +47,7 @@ private:
 	bool CheckValidationLayerSupport();
 
 	void InitSwapchain(bool VsyncEnabled);
+	void RecreateSwapchain(bool VsyncEnabled);
 	void CreateSwapchain(uint32_t width, uint32_t height, bool Vsync);
 	void DestroySwapchain();
 	
@@ -58,8 +57,8 @@ private:
 	void InitRenderPasses();
 	void InitPipelines();
 	void InitGlobalPipelines();
-
-	void DrawBackground(VkCommandBuffer cmd);
+	void InitFramebuffers();
+	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
 public:
 	struct SDL_Window* window{ nullptr };
@@ -82,6 +81,7 @@ public:
 	VkFormat swapchainImageFormat;
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;
+	std::vector<VkFramebuffer> swapchainFramebuffers;
 	VkExtent2D swapchainExtent;
 	AllocatedImage drawImage;
 	VkExtent2D drawExtent;
@@ -89,6 +89,8 @@ public:
 	bool isInitialized{ false };
 	int frameNumber{ 0 };
 	bool stopRendering{ false };
+	bool VsyncEnabled{ true };
+	bool framebufferResized = false;
 
 	DescriptorAllocator globalDescriptorAllocator;
 	VkDescriptorSet drawImageDescriptors;
