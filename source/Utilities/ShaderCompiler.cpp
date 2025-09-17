@@ -129,7 +129,7 @@ namespace ShaderCompiler
 		}
 		catch (const std::exception& e)
 		{
-
+			fmt::print("Shader compilation error: {}\n", e.what());
 		}
 		
 	}

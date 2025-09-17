@@ -25,22 +25,6 @@ struct FrameData
 	DeletionQueue deletionQueue;
 };
 
-struct ComputePushConstants {
-	glm::vec4 data1;
-	glm::vec4 data2;
-	glm::vec4 data3;
-	glm::vec4 data4;
-};
-
-struct ComputeEffect {
-	const char* name;
-
-	VkPipeline pipeline;
-	VkPipelineLayout layout;
-
-	ComputePushConstants data;
-};
-
 constexpr unsigned int FRAME_OVERLAP = 2;
 
 class VulkanEngine {
@@ -72,7 +56,7 @@ private:
 	void InitSyncStructures();
 	void InitDescriptors();
 	void InitPipelines();
-	void InitBackgroundPipelines();
+	void InitGlobalPipelines();
 
 	void DrawBackground(VkCommandBuffer cmd);
 
@@ -112,16 +96,11 @@ public:
 	VkDescriptorSet drawImageDescriptors;
 	VkDescriptorSetLayout drawImageDescriptorLayout;
 
-	VkPipeline gradientPipeline;
-	VkPipelineLayout gradientPipelineLayout;		 //Imgui stuff
+	VkPipeline Pipeline;
+	VkPipelineLayout PipelineLayout;
 
 	std::vector<VkSemaphore> imagePresentSemaphores;
-
 private:
-
-	std::vector<ComputeEffect> backgroundEffects;
-	int currentBackgroundEffect{ 0 };
-
 	FrameData frames[FRAME_OVERLAP];
 
 	DeletionQueue swapchainDestroy;   // size/format-dependent stuff
