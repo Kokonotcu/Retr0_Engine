@@ -88,6 +88,10 @@ struct DeletionQueue {
             vkDestroySampler(device, *it, nullptr);
         samplers.clear();
 
+        for (auto it = renderPasses.rbegin(); it != renderPasses.rend(); ++it)
+            vkDestroyRenderPass(device, *it, nullptr);
+        renderPasses.clear();
+
         for (auto it = commandPools.rbegin(); it != commandPools.rend(); ++it)
             vkDestroyCommandPool(device, *it, nullptr);
         commandPools.clear();

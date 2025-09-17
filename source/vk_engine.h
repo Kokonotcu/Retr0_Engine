@@ -55,6 +55,7 @@ private:
 	void InitCommands();
 	void InitSyncStructures();
 	void InitDescriptors();
+	void InitRenderPasses();
 	void InitPipelines();
 	void InitGlobalPipelines();
 
@@ -79,25 +80,23 @@ public:
 
 	VkSwapchainKHR swapchain;
 	VkFormat swapchainImageFormat;
-
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;
 	VkExtent2D swapchainExtent;
+	AllocatedImage drawImage;
+	VkExtent2D drawExtent;
 
 	bool isInitialized{ false };
 	int frameNumber{ 0 };
 	bool stopRendering{ false };
 
-	AllocatedImage drawImage;
-	VkExtent2D drawExtent;
-
 	DescriptorAllocator globalDescriptorAllocator;
-
 	VkDescriptorSet drawImageDescriptors;
 	VkDescriptorSetLayout drawImageDescriptorLayout;
 
-	VkPipeline Pipeline;
-	VkPipelineLayout PipelineLayout;
+	VkRenderPass renderPass;
+	VkPipeline graphicsPipeline;
+	VkPipelineLayout graphicsPipelineLayout;
 
 	std::vector<VkSemaphore> imagePresentSemaphores;
 private:
