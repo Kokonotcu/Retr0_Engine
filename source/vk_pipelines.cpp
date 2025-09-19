@@ -2,7 +2,7 @@
 #include <fstream>
 #include <vk_initializers.h>
 
-bool vkutil::load_shader_module(const char* filePath,
+bool vkutil::load_shader_module(std::string filePath,
     VkDevice device,
     VkShaderModule* outShaderModule)
 {

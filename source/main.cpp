@@ -4,7 +4,7 @@ int main(int argc, char* argv[])
 {
 
 #ifdef DEBUG
-	ShaderCompiler::CompileFromDir("shaders/");
+	ShaderCompiler::CompileFromDir(FilePathManager::GetShadersDirectory().string());
 #endif // DEBUG
 
 	VulkanEngine engine;
