@@ -1,25 +1,27 @@
 ﻿#pragma once
+#include <gfx/vk_loader.h>
+#include <gfx/vk_types.h>
+#include <gfx/vk_images.h>
+#include <gfx/vk_initializers.h>
+#include <gfx/vk_types.h>
+#include <gfx/vk_pipelines.h>
 
-#include <vk_loader.h>
-#include <vk_types.h>
-#include <vk_images.h>
-#include <vk_descriptors.h>
-#include <vk_initializers.h>
-#include <vk_types.h>
-#include <vk_pipelines.h>
+#include <resources/vk_descriptors.h>
+
 #include <chrono>
 #include <thread>
+
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-
-#include "Utilities/ShaderCompiler.h"
-#include "Utilities/DeletionQueue.h"
-#include "Utilities/FilePathManager.h"
+#include "tools/ShaderCompiler.h"
+#include "resources/DeletionQueue.h"
+#include "tools/FilePathManager.h"
 
 struct FrameData 
 {

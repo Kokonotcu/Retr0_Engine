@@ -1,4 +1,4 @@
-﻿#include <vk_descriptors.h>
+﻿#include <resources/vk_descriptors.h>
 
 void DescriptorLayoutBuilder::AddBinding(uint32_t binding, VkDescriptorType type)
 {

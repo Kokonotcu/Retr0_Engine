@@ -50,7 +50,6 @@ target("retr0_engine")
         "external/fmt/include",
         "external/imgui",
 		"external/SDL/include",
-		"source/Utilities",
         {public = true}
     )
     add_defines("FMT_HEADER_ONLY")
@@ -64,10 +63,8 @@ target("retr0_engine")
         "external/imgui/imgui_impl_sdl3.cpp",
         "external/imgui/imgui_impl_vulkan.cpp",
 		"external/vkbootstrap/**.cpp",
-		"external/fastgltf/src/**.cpp",
-		"source/Utilities/**.cpp"
+		"external/fastgltf/src/**.cpp"
     )
-	add_headerfiles("source/Utilities/**.h", "source/Utilities/**.hpp")
 
     -- -------------------- Linux --------------------
     if is_plat("linux") then
