@@ -181,6 +181,8 @@ void VulkanEngine::InitVulkan()
 	auto gq_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
 	auto iq_ret = vkbDevice.get_queue(vkb::QueueType::transfer);
 
+    auto gqi_ret = vkbDevice.get_queue_index(vkb::QueueType::graphics);
+	auto iqi_ret = vkbDevice.get_queue_index(vkb::QueueType::transfer);
 #ifdef DEBUG
     if (!gq_ret)
     {
@@ -189,16 +191,13 @@ void VulkanEngine::InitVulkan()
     }
     if (!iq_ret)
     {
-		fmt::print("failed to get immediate queue: {}\n", iq_ret.error().message());
-        return;
+		iq_ret = gq_ret;
+		iqi_ret = gqi_ret;
 	}
 #endif // DEBUG
 
 	graphicsQueue = gq_ret.value();
 	immediateQueue = iq_ret.value();
-
-	auto gqi_ret = vkbDevice.get_queue_index(vkb::QueueType::graphics);
-	auto iqi_ret = vkbDevice.get_queue_index(vkb::QueueType::transfer);
 
 #ifdef DEBUG
     if (!gqi_ret)
@@ -208,11 +207,10 @@ void VulkanEngine::InitVulkan()
     }
     if (!iqi_ret)
 	{
-        fmt::print("failed to get immediate queue index: {}\n", iqi_ret.error().message());
+        fmt::print("failed to attach self to graphics queue index: {}\n", iqi_ret.error().message());
         return;
 	}
 #endif // DEBUG
-
 
     graphicsQueueIndex = gqi_ret.value();
 	immediateQueueIndex = iqi_ret.value();
