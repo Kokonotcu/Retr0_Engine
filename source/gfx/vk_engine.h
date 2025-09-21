@@ -36,7 +36,7 @@ constexpr unsigned int FRAME_OVERLAP = 2;
 
 class VulkanEngine {
 public:
-
+	VulkanEngine() = default;
 	static VulkanEngine& Get();
 
 	//initializes everything in the engine
@@ -122,8 +122,9 @@ public:
 	VkDescriptorSetLayout drawImageDescriptorLayout;
 
 	VkRenderPass renderPass;
-	VkPipeline graphicsPipeline;
+	VkPipeline globalPipeline;
 	VkPipelineLayout graphicsPipelineLayout;
+	GraphicsPipeline graphicsPipeline;
 
 	std::vector<VkSemaphore> imagePresentSemaphores;
 

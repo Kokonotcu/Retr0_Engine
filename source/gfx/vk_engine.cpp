@@ -189,12 +189,13 @@ void VulkanEngine::InitVulkan()
         fmt::print("failed to get graphics queue: {}\n", gq_ret.error().message());
 		return;
     }
+#endif // DEBUG
+
     if (!iq_ret)
     {
 		iq_ret = gq_ret;
 		iqi_ret = gqi_ret;
 	}
-#endif // DEBUG
 
 	graphicsQueue = gq_ret.value();
 	immediateQueue = iq_ret.value();
@@ -461,201 +462,47 @@ void VulkanEngine::InitPipelines()
 
 void VulkanEngine::InitGlobalPipelines()
 {
-    // Pipeline layout :
-	// Vertex and Fragment Shader Stage --> Dynamic State configuration --> Vertex Input --> Input Assembly --> Viewports and Scissors --> Rasterizer --> Multisampling --> Depth/Stencil --> Color Blending
+	graphicsPipeline.SetDevice(device);
 
     // -------------------------------------------------------------------------Vertex and Fragment Shader Stage-------------------------------------------------------------------------//
-    VkShaderModule vertexShader;
-    if (!ShaderCompiler::LoadShaderModule(FilePathManager::GetShaderPath("pushed_triangle.vert.spv").string(), device, &vertexShader)) {
-        fmt::print("Error when building the vertex shader \n");
-    }
-
-    VkShaderModule fragmentShader;
-    if (!ShaderCompiler::LoadShaderModule(FilePathManager::GetShaderPath("hardcoded_triangle_red.frag.spv").string(), device, &fragmentShader)) {
-        fmt::print("Error when building the fragment shader \n");
-    }
-
-    VkPushConstantRange bufferRange{};
-    bufferRange.offset = 0;
-    bufferRange.size = sizeof(GPUDrawPushConstants);
-    bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-    VkPipelineShaderStageCreateInfo vertexStageInfo{};
-    vertexStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vertexStageInfo.pNext = nullptr;
-    vertexStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertexStageInfo.module = vertexShader;
-    vertexStageInfo.pName = "main";
-
-    VkPipelineShaderStageCreateInfo fragmentStageInfo{};
-    fragmentStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    fragmentStageInfo.pNext = nullptr;
-    fragmentStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragmentStageInfo.module = fragmentShader;
-    fragmentStageInfo.pName = "main";
-
-    VkPipelineShaderStageCreateInfo shaderStages[] = { vertexStageInfo, fragmentStageInfo };
+    graphicsPipeline.CreateVertexShaderModule<GPUDrawPushConstants>("pushed_triangle.vert.spv");
+    graphicsPipeline.CreateFragmentShaderModule("hardcoded_triangle_red.frag.spv");
     // -------------------------------------------------------------------------Vertex and Fragment Shader Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Dynamic State configuration-------------------------------------------------------------------------//
-    std::vector<VkDynamicState> dynamicStates = {
-    VK_DYNAMIC_STATE_VIEWPORT,
-    VK_DYNAMIC_STATE_SCISSOR
-    };
-
-    VkPipelineDynamicStateCreateInfo dynamicState{};
-    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
-    dynamicState.pDynamicStates = dynamicStates.data();
+	graphicsPipeline.CreateDynamicState();
     // -------------------------------------------------------------------------Dynamic State configuration-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Vertex Input Stage-------------------------------------------------------------------------//
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.pVertexBindingDescriptions = nullptr; // Optional helps define spacing between data and whether the data is per-vertex or per-instance
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-	vertexInputInfo.pVertexAttributeDescriptions = nullptr; // Optional helps define how to extract a vertex attribute from a chunk of vertex data originating from a binding description
+	graphicsPipeline.CreateVertexInput();
     // -------------------------------------------------------------------------Vertex Input Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Input Assembly Stage-------------------------------------------------------------------------//
-    //Normally, the vertices are loaded from the vertex buffer by index in sequential order,
-    // but with an element buffer you can specify the indices to use yourself. 
-    // This allows you to perform optimizations like reusing vertices. 
-    // If you set the primitiveRestartEnable member to VK_TRUE, 
-    // then it's possible to break up lines and triangles in the _STRIP topology modes by using a special index of 0xFFFF or 0xFFFFFFFF.
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
+	graphicsPipeline.CreateInputAssembly();
     // -------------------------------------------------------------------------Input Assembly Stage-------------------------------------------------------------------------//
 
-    // -------------------------------------------------------------------------Viewports and scissors-------------------------------------------------------------------------//
-    // Defined in draw instead
-    // 
-    //VkViewport viewport{};
-    //viewport.x = 0.0f;
-    //viewport.y = 0.0f;
-    //viewport.width = (float)swapchainExtent.width;
-    //viewport.height = (float)swapchainExtent.height;
-    //viewport.minDepth = 0.0f;
-    //viewport.maxDepth = 1.0f;
-    //
-    //VkRect2D scissor{};
-    //scissor.offset = { 0, 0 };
-    //scissor.extent = swapchainExtent;
-    //
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-    // -------------------------------------------------------------------------Viewports and scissors-------------------------------------------------------------------------//
-
     // -------------------------------------------------------------------------Rasterizer Stage-------------------------------------------------------------------------//
-    VkPipelineRasterizationStateCreateInfo rasterizer{};
-    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer.polygonMode = VK_POLYGON_MODE_FILL; // VK_POLYGON_MODE_LINE for wireframe // VK_POLYGON_MODE_POINT for points
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT; 
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
-    rasterizer.depthBiasConstantFactor = 0.0f; // Optional
-    rasterizer.depthBiasClamp = 0.0f; // Optional
-    rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
+	graphicsPipeline.CreateRasterizer();
     // -------------------------------------------------------------------------Rasterizer Stage-------------------------------------------------------------------------//
 
      // -------------------------------------------------------------------------Multisampling Stage-------------------------------------------------------------------------//
-    VkPipelineMultisampleStateCreateInfo multisampling{};
-    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampling.minSampleShading = 1.0f; // Optional
-    multisampling.pSampleMask = nullptr; // Optional
-    multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
-    multisampling.alphaToOneEnable = VK_FALSE; // Optional
+	graphicsPipeline.CreateMultisampling();
      // -------------------------------------------------------------------------Multisampling Stage-------------------------------------------------------------------------//
-
-    // -------------------------------------------------------------------------Depth/Stencil Stage-------------------------------------------------------------------------//
-        //We are not using a depth buffer yet, so disable it
-    // -------------------------------------------------------------------------Depth/Stencil Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
-    
-	//Can be used for transparency
-    //colorBlendAttachment.blendEnable = VK_TRUE;
-    //colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    //colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    //colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-    // colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    // colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-    //colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
-    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
-    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
-
-    VkPipelineColorBlendStateCreateInfo colorBlending{};
-    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
-    colorBlending.blendConstants[0] = 0.0f; // Optional
-    colorBlending.blendConstants[1] = 0.0f; // Optional
-    colorBlending.blendConstants[2] = 0.0f; // Optional
-    colorBlending.blendConstants[3] = 0.0f; // Optional
+    // Does not use depth for now
+	graphicsPipeline.CreateBlending(nullptr, false, VK_COMPARE_OP_LESS);
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
 
 	// -------------------------------------------------------------------------Pipeline Layout-------------------------------------------------------------------------//
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0; // Optional
-    pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &bufferRange;
-
-    VK_CHECK(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout));
+	graphicsPipeline.CreatePipelineLayout();
     // -------------------------------------------------------------------------Pipeline Layout-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Pipeline Creation-------------------------------------------------------------------------//
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
-
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = nullptr; // Optional
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;
-
-    pipelineInfo.layout = graphicsPipelineLayout;
-
-    pipelineInfo.renderPass = renderPass;
-    pipelineInfo.subpass = 0;
-
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-    pipelineInfo.basePipelineIndex = -1; // Optional
-
-    VK_CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline));
+    graphicsPipeline.CreateGraphicsPipeline(renderPass);
     // -------------------------------------------------------------------------Pipeline Creation-------------------------------------------------------------------------//
-    
-    vkDestroyShaderModule(device, vertexShader, nullptr);
-    vkDestroyShaderModule(device, fragmentShader, nullptr);
-
-	mainDeletionQueue.addPipeline(graphicsPipeline);
-    mainDeletionQueue.addPipelineLayout(graphicsPipelineLayout);
+	mainDeletionQueue.addPipeline(graphicsPipeline.GetPipeline());
+    mainDeletionQueue.addPipelineLayout(graphicsPipeline.GetPipelineLayout());
 }
 
 void VulkanEngine::InitFramebuffers()
@@ -699,13 +546,13 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline.GetPipeline());
 
     GPUDrawPushConstants pushConstants;
 
     // View: camera at (0,0,5) looking at origin
     glm::mat4 view = glm::lookAt(
-        glm::vec3(0.0f, 0.0f,0.5f),
+        glm::vec3(0.0f, 0.0f,3.f),
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f)
     );
@@ -720,19 +567,7 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     // If your push constants hold MVP, name it that:
     pushConstants.worldMatrix = proj * view;
 
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(swapchainExtent.width);
-    viewport.height = static_cast<float>(swapchainExtent.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.offset = { 0, 0 };
-    scissor.extent = swapchainExtent;
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchainExtent);
 
     pushConstants.vertexBuffer = testMeshes[2]->meshBuffers.vertexBufferAddress;
 
