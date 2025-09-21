@@ -17,11 +17,13 @@ const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
  };
 
-#ifdef DEBUG
-    const bool enableValidationLayers = true;
- #else
-    const bool enableValidationLayers = false;
- #endif
+//#ifdef DEBUG
+//    const bool enableValidationLayers = true;
+// #else
+//    const bool enableValidationLayers = false;
+// #endif
+
+const bool enableValidationLayers = true; 
 
 VulkanEngine& VulkanEngine::Get() { return *loadedEngine; }
 void VulkanEngine::Init()
@@ -37,8 +39,8 @@ void VulkanEngine::Init()
         windowExtent.height,
         window_flags
     );
+   fmt::print("{}",SDL_GetError());
    SDL_SetWindowResizable(window, true);
-
 
     InitVulkan();
 
@@ -93,7 +95,6 @@ bool VulkanEngine::CheckValidationLayerSupport()
 
 void VulkanEngine::InitVulkan()
 {
-
     if (enableValidationLayers && !CheckValidationLayerSupport())
     {
         throw std::runtime_error("validation layers requested, but not available!");
@@ -102,18 +103,31 @@ void VulkanEngine::InitVulkan()
     vkb::InstanceBuilder builder;
 
     //make the vulkan instance, with basic debug features
-    vkb::Instance vkbInst = builder.set_app_name("Retr0 Engine")
+    auto inst_ret = builder.set_app_name("Retr0 Engine")
         .request_validation_layers(enableValidationLayers)
         .use_default_debug_messenger()
         .require_api_version(1, 3, 0)
-        .build()
-        .value();
+        .build();
+
+#ifdef DEBUG
+    if (!inst_ret)
+    {
+		fmt::print("failed to create instance: {}\n", inst_ret.error().message());
+        return;
+    }
+#endif // DEBUG
+
+	 vkb::Instance vkbInst = inst_ret.value();
 
     //grab the instance 
     instance = vkbInst.instance;
     debugMessenger = vkbInst.debug_messenger;
 
-    SDL_Vulkan_CreateSurface(window, instance, NULL,&surface);
+    if (!SDL_Vulkan_CreateSurface(window, instance, NULL, &surface)) 
+    {
+		fmt::print("failed to create surface: {}\n", SDL_GetError());
+        return;
+    }
 
     //vulkan 1.3 features
     VkPhysicalDeviceVulkan13Features features{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
@@ -128,27 +142,80 @@ void VulkanEngine::InitVulkan()
     //use vkbootstrap to select a gpu. 
     //We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct features
     vkb::PhysicalDeviceSelector selector{ vkbInst };
-    vkb::PhysicalDevice physicalDevice = selector
+
+    auto phy_ret = selector
         .set_minimum_version(1, 3)
         .set_required_features_13(features)
         .set_required_features_12(features12)
         .set_surface(surface)
-        .select()
-        .value();
+        .select();
+
+#ifdef DEBUG
+    if (!phy_ret)
+    {
+        fmt::print("failed to select physical device: {}\n", phy_ret.error().message());
+        return;
+	}
+#endif // DEBUG
+
+	vkb::PhysicalDevice physicalDevice = phy_ret.value();
 
 
     //create the final vulkan device
     vkb::DeviceBuilder deviceBuilder{ physicalDevice };
-    vkb::Device vkbDevice = deviceBuilder.build().value();
+    auto dev_ret = deviceBuilder.build();
+#ifdef DEBUG
+    if (!dev_ret)
+    {
+        fmt::print("failed to create logical device: {}\n", dev_ret.error().message());
+		return;
+	}
+#endif // DEBUG
+
+    vkb::Device vkbDevice = dev_ret.value();
 
     // Get the VkDevice handle used in the rest of a vulkan application
     device = vkbDevice.device;
     chosenGPU = physicalDevice.physical_device;
 
-    graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
-	immediateQueue = vkbDevice.get_queue(vkb::QueueType::transfer).value();
-    graphicsQueueIndex = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
-	immediateQueueIndex = vkbDevice.get_queue_index(vkb::QueueType::transfer).value();
+	auto gq_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
+	auto iq_ret = vkbDevice.get_queue(vkb::QueueType::transfer);
+
+#ifdef DEBUG
+    if (!gq_ret)
+    {
+        fmt::print("failed to get graphics queue: {}\n", gq_ret.error().message());
+		return;
+    }
+    if (!iq_ret)
+    {
+		fmt::print("failed to get immediate queue: {}\n", iq_ret.error().message());
+        return;
+	}
+#endif // DEBUG
+
+	graphicsQueue = gq_ret.value();
+	immediateQueue = iq_ret.value();
+
+	auto gqi_ret = vkbDevice.get_queue_index(vkb::QueueType::graphics);
+	auto iqi_ret = vkbDevice.get_queue_index(vkb::QueueType::transfer);
+
+#ifdef DEBUG
+    if (!gqi_ret)
+    {
+		fmt::print("failed to get graphics queue index: {}\n", gqi_ret.error().message());
+		return;
+    }
+    if (!iqi_ret)
+	{
+        fmt::print("failed to get immediate queue index: {}\n", iqi_ret.error().message());
+        return;
+	}
+#endif // DEBUG
+
+
+    graphicsQueueIndex = gqi_ret.value();
+	immediateQueueIndex = iqi_ret.value();
 
     // initialize the memory allocator
     VmaAllocatorCreateInfo allocatorInfo = {};
@@ -158,9 +225,6 @@ void VulkanEngine::InitVulkan()
     allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     vmaCreateAllocator(&allocatorInfo, &allocator);
 
-    // Initialize the deletion queues
-    //for (int i = 0; i < FRAME_OVERLAP; ++i)
-    //    frames[i].deletionQueue.init(device, allocator);
     swapchainDestroy.init(device, allocator);
     mainDeletionQueue.init(device, allocator);
 }
@@ -404,12 +468,12 @@ void VulkanEngine::InitGlobalPipelines()
 
     // -------------------------------------------------------------------------Vertex and Fragment Shader Stage-------------------------------------------------------------------------//
     VkShaderModule vertexShader;
-    if (!vkutil::load_shader_module(FilePathManager::GetShaderPath("pushed_triangle.vert.spv").string(), device, &vertexShader)) {
+    if (!ShaderCompiler::LoadShaderModule(FilePathManager::GetShaderPath("pushed_triangle.vert.spv").string(), device, &vertexShader)) {
         fmt::print("Error when building the vertex shader \n");
     }
 
     VkShaderModule fragmentShader;
-    if (!vkutil::load_shader_module(FilePathManager::GetShaderPath("hardcoded_triangle_red.frag.spv").string(), device, &fragmentShader)) {
+    if (!ShaderCompiler::LoadShaderModule(FilePathManager::GetShaderPath("hardcoded_triangle_red.frag.spv").string(), device, &fragmentShader)) {
         fmt::print("Error when building the fragment shader \n");
     }
 

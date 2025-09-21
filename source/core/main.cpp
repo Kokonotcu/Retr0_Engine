@@ -4,9 +4,10 @@ int main(int argc, char* argv[])
 {
 
 #ifdef DEBUG
-	ShaderCompiler::CompileFromDir(FilePathManager::GetShadersDirectory().string());
+	//ShaderCompiler::CompileFromDir(FilePathManager::GetShadersDirectory().string());
 #endif // DEBUG
 
+	ShaderCompiler::CompileFromDir(FilePathManager::GetShadersDirectory().string());
 	VulkanEngine engine;
 
 	engine.Init();	
