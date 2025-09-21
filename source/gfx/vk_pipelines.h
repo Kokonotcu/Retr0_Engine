@@ -66,7 +66,7 @@ public:
 		if (pushConstants.size() > 0)
 		{
 			pushConstants.push_back(VkPushConstantRange{});
-			pushConstants[1].offset = pushConstants[0].size();
+			pushConstants[1].offset = pushConstants[0].size;
 			pushConstants[1].size = sizeof(fragmentBufferType);
 			pushConstants[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		}
