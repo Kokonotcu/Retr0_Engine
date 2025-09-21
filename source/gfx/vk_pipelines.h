@@ -34,7 +34,7 @@ public:
 	template<typename vertexBufferType>
 	void CreateVertexShaderModule(const char* fileName)
 	{
-		if (ShaderCompiler::LoadShaderModule(FilePathManager::GetShaderPath(fileName).string(), device, &vertexShader))
+		if (!ShaderCompiler::LoadShaderModule(FilePathManager::GetShaderPath(fileName).string(), device, &vertexShader))
 		{
 			fmt::print("Error when building the vertex shader \n");
 		}

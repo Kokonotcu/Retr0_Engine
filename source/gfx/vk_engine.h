@@ -22,6 +22,7 @@
 #include "tools/ShaderCompiler.h"
 #include "resources/DeletionQueue.h"
 #include "tools/FilePathManager.h"
+#include "resources/vk_swapchain.h"
 
 struct FrameData 
 {
@@ -55,18 +56,18 @@ private:
 	void InitVulkan();
 	bool CheckValidationLayerSupport();
 
-	void InitSwapchain(bool VsyncEnabled);
-	void RecreateSwapchain(bool VsyncEnabled);
-	void CreateSwapchain(uint32_t width, uint32_t height, bool Vsync);
-	void DestroySwapchain();
+	//void InitSwapchain(bool VsyncEnabled);
+	//void RecreateSwapchain(bool VsyncEnabled);
+	//void CreateSwapchain(uint32_t width, uint32_t height, bool Vsync);
+	//void DestroySwapchain();
 	
 	void InitCommands();
 	void InitSyncStructures();
 	void InitDescriptors();
-	void InitRenderPasses();
+	//void InitRenderPasses();
 	void InitPipelines();
 	void InitGlobalPipelines();
-	void InitFramebuffers();
+	//void InitFramebuffers();
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
 	void InitDefaultMesh();
@@ -102,38 +103,38 @@ public:
 	VkSurfaceKHR surface;// Vulkan window surface
 	VkExtent2D windowExtent{ 800 ,600 };
 
-	VkSwapchainKHR swapchain;
-	VkFormat swapchainImageFormat;
-	std::vector<VkImage> swapchainImages;
-	std::vector<VkImageView> swapchainImageViews;
-	std::vector<VkFramebuffer> swapchainFramebuffers;
-	VkExtent2D swapchainExtent;
-	AllocatedImage drawImage;
-	VkExtent2D drawExtent;
+	Swapchain swapchain;
+
+	//VkSwapchainKHR swapchain;														//	   d
+	//VkFormat swapchainImageFormat;											  //	  d
+	//std::vector<VkImage> swapchainImages;									  //  d
+	//std::vector<VkImageView> swapchainImageViews;					 //	  d
+	//std::vector<VkFramebuffer> swapchainFramebuffers;				 //	  d
+	//VkExtent2D swapchainExtent;														//	  d
+	//AllocatedImage drawImage;															  //  d
+	//VkExtent2D drawExtent;																  //	  disable
 
 	bool isInitialized{ false };
 	int frameNumber{ 0 };
+	bool framebufferResized = false;
 	bool stopRendering{ false };
 	bool VsyncEnabled{ true };
-	bool framebufferResized = false;
 
 	DescriptorAllocator globalDescriptorAllocator;
 	VkDescriptorSet drawImageDescriptors;
 	VkDescriptorSetLayout drawImageDescriptorLayout;
 
-	VkRenderPass renderPass;
-	VkPipeline globalPipeline;
-	VkPipelineLayout graphicsPipelineLayout;
+	//VkRenderPass renderPass; //disable
 	GraphicsPipeline graphicsPipeline;
 
-	std::vector<VkSemaphore> imagePresentSemaphores;
+	//std::vector<VkSemaphore> imagePresentSemaphores; //disable
 
 	//Mesh Stuff
 	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 private:
 	FrameData frames[FRAME_OVERLAP];
 
-	DeletionQueue swapchainDestroy;   // size/format-dependent stuff
+	//DeletionQueue swapchainDestroy;   // size/format-dependent stuff     //disable
 	DeletionQueue mainDeletionQueue;      // allocator, long-lived objects
 };
 

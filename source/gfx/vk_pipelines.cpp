@@ -43,7 +43,6 @@ void GraphicsPipeline::CreateVertexShaderModule(const char* fileName)
 	if (ShaderCompiler::LoadShaderModule(FilePathManager::GetShaderPath(fileName).string(), device, &vertexShader))
 		fmt::print("Error when building the vertex shader \n");
 	
-
 	vertexShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	vertexShaderStageInfo.pNext = nullptr;
 	vertexShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;

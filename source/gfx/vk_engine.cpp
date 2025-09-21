@@ -44,15 +44,12 @@ void VulkanEngine::Init()
 
     InitVulkan();
 
-    InitSwapchain(VsyncEnabled);
-
-    InitRenderPasses();
+	swapchain.SetProperties(allocator, chosenGPU, device, surface, windowExtent);
+	swapchain.Build(VsyncEnabled);
 
 	InitDescriptors();
 
 	InitPipelines();
-
-    InitFramebuffers();
 
     InitCommands();
 
@@ -224,100 +221,7 @@ void VulkanEngine::InitVulkan()
     allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     vmaCreateAllocator(&allocatorInfo, &allocator);
 
-    swapchainDestroy.init(device, allocator);
     mainDeletionQueue.init(device, allocator);
-}
-
-void VulkanEngine::InitSwapchain(bool VsyncEnabled)
-{
-    CreateSwapchain(windowExtent.width, windowExtent.height, VsyncEnabled);
-
-    //draw image size will match the window
-    VkExtent3D drawImageExtent = {
-        swapchainExtent.width,
-        swapchainExtent.height,
-        1
-    };
-
-    //hardcoding the draw format to 32 bit float
-    drawImage.imageFormat = swapchainImageFormat;
-    drawImage.imageExtent = drawImageExtent;
-
-    VkImageUsageFlags drawImageUsages{};
-    drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    VkImageCreateInfo rimg_info = vkinit::image_create_info(drawImage.imageFormat, drawImageUsages, drawImageExtent);
-
-    //for the draw image, we want to allocate it from gpu local memory
-    VmaAllocationCreateInfo rimg_allocinfo = {};
-    rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    vmaCreateImage(allocator, &rimg_info, &rimg_allocinfo, &drawImage.image, &drawImage.allocation, nullptr);
-
-    //build a image-view for the draw image to use for rendering
-    VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(drawImage.imageFormat, drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
-
-    VK_CHECK(vkCreateImageView(device, &rview_info, nullptr, &drawImage.imageView));
-
-    swapchainDestroy.addImageView(drawImage.imageView);
-    swapchainDestroy.addImage(drawImage.image, drawImage.allocation);
-
-    imagePresentSemaphores.resize(swapchainImages.size());
-    VkSemaphoreCreateInfo semInfo = vkinit::semaphore_create_info();
-    for (size_t i = 0; i < imagePresentSemaphores.size(); ++i) 
-    {
-        VK_CHECK(vkCreateSemaphore(device, &semInfo, nullptr, &imagePresentSemaphores[i]));
-        swapchainDestroy.addSemaphore(imagePresentSemaphores[i]);
-    }
-}
-
-void VulkanEngine::CreateSwapchain(uint32_t width, uint32_t height, bool Vsync = true)
-{
-    vkb::SwapchainBuilder swapchainBuilder{ chosenGPU,device,surface };
-    vkb::Swapchain vkbSwapchain;
-
-    vkbSwapchain = swapchainBuilder
-        //.use_default_format_selection()
-        .set_desired_format(VkSurfaceFormatKHR{ .format = VK_FORMAT_R16G16B16A16_SFLOAT, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
-        //use vsync present mode
-        .set_desired_present_mode(Vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR)
-        .set_desired_extent(width, height)
-        .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-        .build()
-        .value();
-    
-	swapchainImageFormat = vkbSwapchain.image_format;
-    //store swapchain and its related images
-    swapchainExtent = vkbSwapchain.extent;
-    swapchain = vkbSwapchain.swapchain;
-    swapchainImages = vkbSwapchain.get_images().value();
-    swapchainImageViews = vkbSwapchain.get_image_views().value();
-}
-
-void VulkanEngine::RecreateSwapchain(bool VsyncEnabled)
-{
-    vkDeviceWaitIdle(device);
-
-	swapchainDestroy.flush();
-	DestroySwapchain();
-
-	InitSwapchain(VsyncEnabled);
-	InitFramebuffers();
-}
-
-void VulkanEngine::DestroySwapchain()
-{
-    vkDestroySwapchainKHR(device, swapchain, nullptr);
-
-    // destroy swapchain resources
-    for (int i = 0; i < swapchainImageViews.size(); i++) 
-    {
-        vkDestroyImageView(device, swapchainImageViews[i], nullptr);
-    }
 }
 
 void VulkanEngine::InitCommands()
@@ -409,52 +313,6 @@ void VulkanEngine::InitDescriptors()
     //mainDeletionQueue.addSetLayout(drawImageDescriptorLayout);
 }
 
-
-void VulkanEngine::InitRenderPasses()
-{
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = swapchainImageFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    VK_CHECK(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
-	mainDeletionQueue.addRenderPass(renderPass);
-}
-
 void VulkanEngine::InitPipelines()
 {
 	InitGlobalPipelines();
@@ -499,33 +357,10 @@ void VulkanEngine::InitGlobalPipelines()
     // -------------------------------------------------------------------------Pipeline Layout-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Pipeline Creation-------------------------------------------------------------------------//
-    graphicsPipeline.CreateGraphicsPipeline(renderPass);
+    graphicsPipeline.CreateGraphicsPipeline(swapchain.GetRenderPass());
     // -------------------------------------------------------------------------Pipeline Creation-------------------------------------------------------------------------//
 	mainDeletionQueue.addPipeline(graphicsPipeline.GetPipeline());
     mainDeletionQueue.addPipelineLayout(graphicsPipeline.GetPipelineLayout());
-}
-
-void VulkanEngine::InitFramebuffers()
-{
-    swapchainFramebuffers.resize(swapchainImageViews.size());
-
-    for (size_t i = 0; i < swapchainImageViews.size(); i++) {
-        VkImageView attachments[] = {
-			swapchainImageViews[i]
-        };
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = swapchainExtent.width;
-        framebufferInfo.height = swapchainExtent.height;
-        framebufferInfo.layers = 1;
-
-        VK_CHECK(vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapchainFramebuffers[i]));
-		swapchainDestroy.addFramebuffer(swapchainFramebuffers[i]);
-    }
 }
 
 void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
@@ -535,10 +370,10 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = renderPass;
-    renderPassInfo.framebuffer = swapchainFramebuffers[imageIndex];
+    renderPassInfo.renderPass = swapchain.GetRenderPass();
+    renderPassInfo.framebuffer = swapchain.GetFramebuffer(imageIndex);
     renderPassInfo.renderArea.offset = { 0, 0 };
-    renderPassInfo.renderArea.extent = swapchainExtent;
+    renderPassInfo.renderArea.extent = swapchain.GetExtent();
 
     VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
     renderPassInfo.clearValueCount = 1;
@@ -558,7 +393,7 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     );
 
     // Projection: correct near/far order
-    float aspect = float(swapchainExtent.width) / float(swapchainExtent.height);
+    float aspect = float(swapchain.GetExtent().width) / float(swapchain.GetExtent().height);
     glm::mat4 proj = glm::perspective(glm::radians(70.0f), aspect, 0.1f, 10000.0f);
 
     // Vulkan Y-flip (keep this if you’re not using a negative viewport height)
@@ -567,7 +402,7 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     // If your push constants hold MVP, name it that:
     pushConstants.worldMatrix = proj * view;
 
-	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchainExtent);
+	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
 
     pushConstants.vertexBuffer = testMeshes[2]->meshBuffers.vertexBufferAddress;
 
@@ -702,12 +537,11 @@ void VulkanEngine::Cleanup()
         //make sure the gpu has stopped doing its things
         vkDeviceWaitIdle(device);
         
-		swapchainDestroy.flush();
 		mainDeletionQueue.flush();
+        swapchain.Destroy();
 
 		vmaDestroyAllocator(allocator);
 
-        DestroySwapchain();
 
         vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyDevice(device, nullptr);
@@ -724,7 +558,7 @@ void VulkanEngine::Draw()
     VK_CHECK(vkWaitForFences(device, 1, &get_current_frame().renderFence, true, UINT64_MAX));
 
     uint32_t swapchainImageIndex;
-    VkResult result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, get_current_frame().swapchainSemaphore, nullptr, &swapchainImageIndex);
+    VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, get_current_frame().swapchainSemaphore, nullptr, &swapchainImageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -733,7 +567,7 @@ void VulkanEngine::Draw()
         SDL_GetWindowSize(window, &w, &h);
         windowExtent.width = w;
         windowExtent.height = h;
-        RecreateSwapchain(VsyncEnabled);
+        swapchain.Recreate(windowExtent,VsyncEnabled);
         return;
     }
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
@@ -760,7 +594,7 @@ void VulkanEngine::Draw()
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &cmd;
 
-    VkSemaphore signalSemaphores[] = { imagePresentSemaphores[swapchainImageIndex] };
+    VkSemaphore signalSemaphores[] = { swapchain.GetSemaphore(swapchainImageIndex) };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -769,14 +603,12 @@ void VulkanEngine::Draw()
     VkPresentInfoKHR presentInfo = {};
     presentInfo.pNext = nullptr;
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
-
     presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &swapchain;
+    VkSwapchainKHR swapchains[] = { swapchain.GetSwapchain() };
+    presentInfo.pSwapchains = swapchains;
     presentInfo.pImageIndices = &swapchainImageIndex;
-
     presentInfo.pResults = nullptr; // Optional
 
     VkResult resultP = vkQueuePresentKHR(graphicsQueue, &presentInfo);
@@ -789,7 +621,7 @@ void VulkanEngine::Draw()
         SDL_GetWindowSize(window, &w, &h);
         windowExtent.width = w;
         windowExtent.height = h;
-        RecreateSwapchain(VsyncEnabled);
+        swapchain.Recreate(windowExtent,VsyncEnabled);
         return;
     }
     else if (resultP != VK_SUCCESS && resultP != VK_SUBOPTIMAL_KHR)
