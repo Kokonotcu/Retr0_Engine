@@ -1,9 +1,5 @@
 ﻿#include <gfx/vk_pipelines.h>
 
-GraphicsPipeline::GraphicsPipeline()
-{
-}
-
 void GraphicsPipeline::UpdateDynamicState(VkCommandBuffer cmd ,VkExtent2D extent)
 {
 	viewport.x = 0.0f;
@@ -21,21 +17,26 @@ void GraphicsPipeline::UpdateDynamicState(VkCommandBuffer cmd ,VkExtent2D extent
 
 void GraphicsPipeline::ClearPipeline()
 {
-	//inputAssembly = { .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
-	//
-	//rasterizer = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
-	//
-	//colorBlendAttachment = {};
-	//
-	//multisampling = { .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
-	//
-	//pipelineLayout = {};
-	//
-	//depthStencil = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-	//
-	//renderInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
-	//
-	//shaderStages.clear();
+	vertexShaderStageInfo = {};
+	fragmentShaderStageInfo = {};
+
+	viewportStateInfo = {};
+	dynamicStateInfo = {};
+
+	vertexInputInfo = {};
+
+	inputAssemblyInfo = {};
+
+	rasterizerInfo = {};
+
+	multisamplingInfo = {};
+
+	depthStencilStateInfo = {};
+	colorBlendStateInfo = {};
+
+	 pipelineLayoutInfo = {};
+
+	pipelineInfo = {};
 }
 
 void GraphicsPipeline::CreateVertexShaderModule(const char* fileName)
@@ -96,17 +97,17 @@ void GraphicsPipeline::CreateInputAssembly()
 
 void GraphicsPipeline::CreateRasterizer()
 {
-	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.depthClampEnable = VK_FALSE;
-	rasterizer.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer.polygonMode = VK_POLYGON_MODE_FILL; // VK_POLYGON_MODE_LINE for wireframe // VK_POLYGON_MODE_POINT for points
-	rasterizer.lineWidth = 1.0f;
-	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	rasterizer.depthBiasEnable = VK_FALSE;
-	rasterizer.depthBiasConstantFactor = 0.0f; // Optional
-	rasterizer.depthBiasClamp = 0.0f; // Optional
-	rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
+	rasterizerInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizerInfo.depthClampEnable = VK_FALSE;
+	rasterizerInfo.rasterizerDiscardEnable = VK_FALSE;
+	rasterizerInfo.polygonMode = VK_POLYGON_MODE_FILL; // VK_POLYGON_MODE_LINE for wireframe // VK_POLYGON_MODE_POINT for points
+	rasterizerInfo.lineWidth = 1.0f;
+	rasterizerInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterizerInfo.depthBiasEnable = VK_FALSE;
+	rasterizerInfo.depthBiasConstantFactor = 0.0f; // Optional
+	rasterizerInfo.depthBiasClamp = 0.0f; // Optional
+	rasterizerInfo.depthBiasSlopeFactor = 0.0f; // Optional
 }
 
 void GraphicsPipeline::CreateMultisampling()
@@ -120,25 +121,9 @@ void GraphicsPipeline::CreateMultisampling()
 	multisamplingInfo.alphaToOneEnable = VK_FALSE; // Optional
 }
 
-void GraphicsPipeline::CreateBlending(VkImageView view, bool depthWriteEnable, VkCompareOp op, VkImageLayout layout /*= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL*/ )
+void GraphicsPipeline::CreateBlending(bool depthWriteEnable, VkCompareOp op)
 {
-	//Can be used for transparency
-	//colorBlendAttachment.blendEnable = VK_TRUE;
-	//colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-	//colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-	//colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-	// colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	// colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	//colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-	depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-	depthAttachment.pNext = nullptr;
-	depthAttachment.imageView = view;
-	depthAttachment.imageLayout = layout;
-	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	depthAttachment.clearValue.depthStencil.depth = 1.f;
-
+	depthStencilStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	depthStencilStateInfo.depthTestEnable = VK_TRUE;
 	depthStencilStateInfo.depthWriteEnable = depthWriteEnable;
 	depthStencilStateInfo.depthCompareOp = op;
@@ -149,14 +134,23 @@ void GraphicsPipeline::CreateBlending(VkImageView view, bool depthWriteEnable, V
 	depthStencilStateInfo.minDepthBounds = 0.f;
 	depthStencilStateInfo.maxDepthBounds = 1.f;
 
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_FALSE;
-	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
-	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+	colorBlendAttachment = {};
+	colorBlendAttachment.colorWriteMask =
+		VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+		VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+	if (false) {
+		colorBlendAttachment.blendEnable = VK_TRUE;
+		colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+		colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+		colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+	}
+	else {
+		colorBlendAttachment.blendEnable = VK_FALSE;
+	}
 
 	colorBlendStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	colorBlendStateInfo.logicOpEnable = VK_FALSE;
@@ -191,7 +185,7 @@ void GraphicsPipeline::CreateGraphicsPipeline(VkRenderPass renderPass)
 	pipelineInfo.pVertexInputState = &vertexInputInfo;
 	pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
 	pipelineInfo.pViewportState = &viewportStateInfo;
-	pipelineInfo.pRasterizationState = &rasterizer;
+	pipelineInfo.pRasterizationState = &rasterizerInfo;
 	pipelineInfo.pMultisampleState = &multisamplingInfo;
 	pipelineInfo.pDepthStencilState = &depthStencilStateInfo; // Optional
 	pipelineInfo.pColorBlendState = &colorBlendStateInfo;

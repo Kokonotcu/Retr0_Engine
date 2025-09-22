@@ -8,7 +8,7 @@
 class GraphicsPipeline
 {
 public:
-	GraphicsPipeline();
+	GraphicsPipeline() = default;
 	//~GraphicsPipeline();
 	void SetDevice(VkDevice dev)
 	{
@@ -91,7 +91,7 @@ public:
 
 	void CreateMultisampling();
 
-	void CreateBlending(VkImageView view, bool depthWriteEnable, VkCompareOp op, VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	void CreateBlending(bool depthWriteEnable, VkCompareOp op);
 
 	void CreatePipelineLayout();
 
@@ -109,6 +109,8 @@ private:
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
 
+	VkPipelineRasterizationStateCreateInfo rasterizerInfo{};
+
 	VkPipelineMultisampleStateCreateInfo multisamplingInfo{};
 
 	VkPipelineDepthStencilStateCreateInfo depthStencilStateInfo{};
@@ -119,7 +121,6 @@ private:
 	VkGraphicsPipelineCreateInfo pipelineInfo{};
 private:
 	//instance handles
-
 	VkDevice device{}; //logical device
 
 	//----------------------------------Shader Stages----------------------------------//
@@ -133,13 +134,9 @@ private:
 	std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT,VK_DYNAMIC_STATE_SCISSOR};
 	//----------------------------------Dynamic State----------------------------------//
 
-	//-------------------------------Rasterizer Stage--------------------------------//
-	VkPipelineRasterizationStateCreateInfo rasterizer{};
-	//-------------------------------Rasterizer Stage--------------------------------//
-
 	//-------------------------------Blending Stage--------------------------------//
 	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-	VkRenderingAttachmentInfo depthAttachment{};
+	//VkRenderingAttachmentInfo depthAttachment{};
 	//-------------------------------Blending Stage--------------------------------//
 
 	//-------------------------------Pipeline Layout--------------------------------//

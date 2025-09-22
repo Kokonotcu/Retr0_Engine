@@ -24,12 +24,12 @@
 #include "tools/FilePathManager.h"
 #include "resources/vk_swapchain.h"
 
-struct FrameData 
+struct FrameCommander 
 {
 	VkCommandPool commandPool;
 	VkCommandBuffer mainCommandBuffer;
 
-	VkSemaphore swapchainSemaphore;
+	VkSemaphore renderSemaphore;
 	VkFence renderFence;
 };
 
@@ -38,7 +38,7 @@ constexpr unsigned int FRAME_OVERLAP = 2;
 class VulkanEngine {
 public:
 	VulkanEngine() = default;
-	static VulkanEngine& Get();
+	VulkanEngine& Get() { return *this; }
 
 	//initializes everything in the engine
 	void Init();
@@ -49,45 +49,32 @@ public:
 	//run main loop
 	void Run();
 
-	FrameData& get_current_frame() { return frames[frameNumber % FRAME_OVERLAP]; };
-	GPUMeshBuffers UploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+	FrameCommander& get_current_frame() { return frames[frameNumber % FRAME_OVERLAP]; };
+	GPUMeshBuffers UploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices); //abstract this out
 private:
-
 	void InitVulkan();
 	bool CheckValidationLayerSupport();
-
-	//void InitSwapchain(bool VsyncEnabled);
-	//void RecreateSwapchain(bool VsyncEnabled);
-	//void CreateSwapchain(uint32_t width, uint32_t height, bool Vsync);
-	//void DestroySwapchain();
 	
 	void InitCommands();
 	void InitSyncStructures();
 	void InitDescriptors();
-	//void InitRenderPasses();
 	void InitPipelines();
 	void InitGlobalPipelines();
-	//void InitFramebuffers();
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 
 	void InitDefaultMesh();
 
-	// immediate submit structures
 	//submit a function to be executed immediately
-	void ImmediateSubmitQueued(std::function<void(VkCommandBuffer cmd)>&& function);
-	VkQueue immediateQueue;
-	uint32_t immediateQueueIndex;
-
-	VkFence immFence;
-	VkCommandBuffer immCommandBuffer;
-	VkCommandPool immCommandPool;
-	// immediate submit structures
-	
+	void ImmediateSubmitQueued(std::function<void(VkCommandBuffer cmd)>&& function);   
+																			 
 	//Utility functions
-	AllocatedBuffer CreateBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-	void DestroyBuffer(const AllocatedBuffer& buffer);
+	AllocatedBuffer CreateBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage); //abstract this out
+	void DestroyBuffer(const AllocatedBuffer& buffer); //abstract this out
 public:
+	///////////////////////////////////////////////////////////////
 	struct SDL_Window* window{ nullptr };
+	VkSurfaceKHR surface;// Vulkan window surface
+	VkExtent2D windowExtent{ 800 ,600 };
 
 	VkInstance instance;// Vulkan library handle
 	VkDebugUtilsMessengerEXT debugMessenger;// Vulkan debug output handle
@@ -95,24 +82,20 @@ public:
 	VkPhysicalDevice chosenGPU;// GPU chosen as the default device
 	VkDevice device; // Vulkan device for commands
 
+	///////////////////////////////////////////////////////////////
 	VkQueue graphicsQueue;
 	uint32_t graphicsQueueIndex;
 
+	VkQueue immediateQueue;
+	uint32_t immediateQueueIndex;
+	VkFence immFence;
+	VkCommandBuffer immCommandBuffer;
+	VkCommandPool immCommandPool;
+	///////////////////////////////////////////////////////////////
+
 	VmaAllocator allocator;
-
-	VkSurfaceKHR surface;// Vulkan window surface
-	VkExtent2D windowExtent{ 800 ,600 };
-
 	Swapchain swapchain;
-
-	//VkSwapchainKHR swapchain;														//	   d
-	//VkFormat swapchainImageFormat;											  //	  d
-	//std::vector<VkImage> swapchainImages;									  //  d
-	//std::vector<VkImageView> swapchainImageViews;					 //	  d
-	//std::vector<VkFramebuffer> swapchainFramebuffers;				 //	  d
-	//VkExtent2D swapchainExtent;														//	  d
-	//AllocatedImage drawImage;															  //  d
-	//VkExtent2D drawExtent;																  //	  disable
+	GraphicsPipeline graphicsPipeline;
 
 	bool isInitialized{ false };
 	int frameNumber{ 0 };
@@ -124,17 +107,14 @@ public:
 	VkDescriptorSet drawImageDescriptors;
 	VkDescriptorSetLayout drawImageDescriptorLayout;
 
-	//VkRenderPass renderPass; //disable
-	GraphicsPipeline graphicsPipeline;
-
-	//std::vector<VkSemaphore> imagePresentSemaphores; //disable
 
 	//Mesh Stuff
-	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
+	std::vector<std::shared_ptr<MeshAsset>> testMeshes; //abstract this out
 private:
-	FrameData frames[FRAME_OVERLAP];
 
-	//DeletionQueue swapchainDestroy;   // size/format-dependent stuff     //disable
-	DeletionQueue mainDeletionQueue;      // allocator, long-lived objects
+	FrameCommander frames[FRAME_OVERLAP];
+	DeletionQueue mainDeletionQueue;
+
+	VulkanEngine* loadedEngine = nullptr;
 };
 

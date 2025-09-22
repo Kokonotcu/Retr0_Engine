@@ -27,12 +27,13 @@ public:
 	void Build(bool vsync);
 	void Recreate(VkExtent2D dim, bool vsync);
 	
-	void Destroy();
+	void Destroy(); //wipes everything
 private:
 	void CreateSwapchain(uint32_t width, uint32_t height,bool Vsync = true);
 	void CreateRenderPass();
 	void CreateFramebuffers(VkRenderPass renderPass);
 
+	void Clear(); //does not destroy renderpass
 public:
 	//getters
 	VkRenderPass GetRenderPass()
@@ -57,6 +58,13 @@ public:
 	}
 
 private:
+	VkFormat pick_depth_format();
+	VkFormat find_supported_format(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+
+	void createDepthResources();
+	
+	
+private:
 	VkPhysicalDevice chosenGPU; 
 	VkDevice device; 
 	VkSurfaceKHR surface;
@@ -67,15 +75,18 @@ private:
 	VkFormat imageFormat;
 	std::vector<VkImage> images = {};
 	std::vector<VkImageView> imageViews = {};
+	VkExtent2D extent;
 
 	VkRenderPass renderPass;
 	std::vector<VkFramebuffer> framebuffers;
 	
-	VkExtent2D extent;
-
 	AllocatedImage drawImage;
+	std::vector<AllocatedImage> depthImages;
 	VkExtent2D drawExtent;
 
 	std::vector<VkSemaphore> imagePresentSemaphores;
 	DeletionQueue destroyQueue;
+
+private:
+	VkFormat depthFormat;
 };

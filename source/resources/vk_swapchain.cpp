@@ -24,6 +24,7 @@ void Swapchain::CreateSwapchain(uint32_t width, uint32_t height, bool Vsync)
 
 void Swapchain::CreateRenderPass()
 {
+    // Color
     VkAttachmentDescription colorAttachment{};
     colorAttachment.format = imageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -38,30 +39,45 @@ void Swapchain::CreateRenderPass()
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    // Depth
+    VkAttachmentDescription depth{};
+    depth.format = depthFormat;                       // pick_depth_format()
+    depth.samples = VK_SAMPLE_COUNT_1_BIT;
+    depth.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depth.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depth.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthRef{ 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
+	subpass.pDepthStencilAttachment = &depthRef;
 
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
+    VkSubpassDependency dep{};
+    dep.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dep.dstSubpass = 0;
+    dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dep.dstStageMask = dep.srcStageMask;
+    dep.srcAccessMask = 0;
+    dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
+    VkAttachmentDescription attachments[2] = { colorAttachment, depth };
 
-    VK_CHECK(vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
-	destroyQueue.addRenderPass(renderPass); // be sure to check validate priority
+    VkRenderPassCreateInfo rpci{ VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+    rpci.attachmentCount = 2;
+    rpci.pAttachments = attachments;
+    rpci.subpassCount = 1;
+    rpci.pSubpasses = &subpass;
+    rpci.dependencyCount = 1;
+    rpci.pDependencies = &dep;
+
+    VK_CHECK(vkCreateRenderPass(device, &rpci, nullptr, &renderPass));
+	//destroyQueue.addRenderPass(renderPass);  DO NOT
 }
 
 void Swapchain::CreateFramebuffers(VkRenderPass renderPass)
@@ -70,13 +86,15 @@ void Swapchain::CreateFramebuffers(VkRenderPass renderPass)
 
     for (size_t i = 0; i < imageViews.size(); i++) {
         VkImageView attachments[] = {
-            imageViews[i]
+            imageViews[i],
+
+            depthImages.empty() ? VK_NULL_HANDLE : depthImages[i].imageView
         };
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.attachmentCount = 2;
         framebufferInfo.pAttachments = attachments;
         framebufferInfo.width = extent.width;
         framebufferInfo.height = extent.height;
@@ -89,6 +107,7 @@ void Swapchain::CreateFramebuffers(VkRenderPass renderPass)
 
 void Swapchain::Build(bool vsync)
 {
+	depthFormat = pick_depth_format();
     CreateSwapchain(extent.width, extent.height, vsync);
     //draw image size will match the window
     VkExtent3D drawImageExtent = {
@@ -113,11 +132,13 @@ void Swapchain::Build(bool vsync)
     rimg_info.imageType = VK_IMAGE_TYPE_2D;
     rimg_info.format = drawImage.imageFormat;
     rimg_info.extent = drawImageExtent;
+    rimg_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     rimg_info.mipLevels = 1;
     rimg_info.arrayLayers = 1;
     rimg_info.samples = VK_SAMPLE_COUNT_1_BIT; //for MSAA. we will not be using it by default, so default it to 1 sample per pixel.
     rimg_info.tiling = VK_IMAGE_TILING_OPTIMAL;  //optimal tiling, which means the image is stored on the best gpu format
     rimg_info.usage = drawImageUsages; //for the draw image, we want to allocate it from gpu local memory
+
     VmaAllocationCreateInfo rimg_allocinfo = {};
     rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -138,6 +159,7 @@ void Swapchain::Build(bool vsync)
     rview_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
     VK_CHECK(vkCreateImageView(device, &rview_info, nullptr, &drawImage.imageView));
+	createDepthResources();
 
     destroyQueue.addImageView(drawImage.imageView);
     destroyQueue.addImage(drawImage.image, drawImage.allocation);
@@ -155,7 +177,6 @@ void Swapchain::Build(bool vsync)
         destroyQueue.addSemaphore(imagePresentSemaphores[i]);
     }
 
-
     if (renderPass == VK_NULL_HANDLE)
         CreateRenderPass();
     CreateFramebuffers(renderPass);
@@ -164,17 +185,14 @@ void Swapchain::Build(bool vsync)
 void Swapchain::Recreate(VkExtent2D dim, bool vsync)
 {
     vkDeviceWaitIdle(device);
-
-    destroyQueue.flush();
-    Destroy();
+    Clear();
 
     UpdateDimensions(dim);
     Build(vsync);
-    
     CreateFramebuffers(renderPass);
 }
 
-void Swapchain::Destroy()
+void Swapchain::Clear()
 {
 	destroyQueue.flush();
 
@@ -183,5 +201,76 @@ void Swapchain::Destroy()
     // destroy swapchain resources
     for (int i = 0; i < imageViews.size(); i++)
         vkDestroyImageView(device, imageViews[i], nullptr);
+}
+
+VkFormat Swapchain::pick_depth_format()
+{
+    return find_supported_format({ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D16_UNORM },
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+    );
+}
+
+VkFormat Swapchain::find_supported_format(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features)
+{
+    for (VkFormat format : candidates)
+    {
+        VkFormatProperties p{};
+        vkGetPhysicalDeviceFormatProperties(chosenGPU, format, &p);
+        if (tiling == VK_IMAGE_TILING_LINEAR && (p.linearTilingFeatures & features) == features) return format;
+        if (tiling == VK_IMAGE_TILING_OPTIMAL && (p.optimalTilingFeatures & features) == features) return format;
+    }
+    return VK_FORMAT_UNDEFINED;
+}
+
+void Swapchain::createDepthResources()
+{
+    depthImages.resize(images.size());
+    for (size_t i = 0; i < images.size(); ++i)
+    {
+        AllocatedImage& di = depthImages[i];
+		di.imageFormat = depthFormat;
+        di.imageExtent = { extent.width, extent.height, 1 };
+
+        VkImageCreateInfo ici{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+        ici.imageType = VK_IMAGE_TYPE_2D;
+        ici.format = di.imageFormat;
+        ici.extent = di.imageExtent;
+        ici.mipLevels = 1;
+        ici.arrayLayers = 1;
+        ici.samples = VK_SAMPLE_COUNT_1_BIT;
+        ici.tiling = VK_IMAGE_TILING_OPTIMAL;
+        ici.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        ici.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        VmaAllocationCreateInfo aci{};
+        aci.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        aci.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+        VK_CHECK(vmaCreateImage(allocator, &ici, &aci, &di.image, &di.allocation, nullptr));
+
+        VkImageAspectFlags aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+        if (di.imageFormat == VK_FORMAT_D24_UNORM_S8_UINT /* or any *S8* */) {
+            aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+
+        VkImageViewCreateInfo ivci{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+        ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        ivci.image = di.image;
+        ivci.format = di.imageFormat;
+        ivci.subresourceRange = { aspect, 0, 1, 0, 1 };
+        VK_CHECK(vkCreateImageView(device, &ivci, nullptr, &di.imageView));
+
+        destroyQueue.addImageView(di.imageView);
+        destroyQueue.addImage(di.image, di.allocation);
+    }
+}
+
+void Swapchain::Destroy()
+{
+    vkDeviceWaitIdle(device);
+
+    Clear();
+    vkDestroyRenderPass(device, renderPass, nullptr);
 }
 

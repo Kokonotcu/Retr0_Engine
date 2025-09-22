@@ -10,22 +10,17 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_vulkan.h"
 
-
-VulkanEngine* loadedEngine = nullptr;
-
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
  };
 
-//#ifdef DEBUG
-//    const bool enableValidationLayers = true;
-// #else
-//    const bool enableValidationLayers = false;
-// #endif
+#ifdef DEBUG
+    const bool enableValidationLayers = true;
+ #else
+    const bool enableValidationLayers = false;
+ #endif
 
-const bool enableValidationLayers = true; 
 
-VulkanEngine& VulkanEngine::Get() { return *loadedEngine; }
 void VulkanEngine::Init()
 {
     // We initialize SDL and create a window with it. 
@@ -249,6 +244,7 @@ void VulkanEngine::InitCommands()
     mainDeletionQueue.addCommandPool(immCommandPool);
 
 }
+
 void VulkanEngine::InitSyncStructures()
 {
     //create syncronization structures
@@ -261,10 +257,10 @@ void VulkanEngine::InitSyncStructures()
     for (int i = 0; i < FRAME_OVERLAP; i++) {
         VK_CHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &frames[i].renderFence));
 
-        VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frames[i].swapchainSemaphore));
+        VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frames[i].renderSemaphore));
 
 		mainDeletionQueue.addFence(frames[i].renderFence);
-		mainDeletionQueue.addSemaphore(frames[i].swapchainSemaphore);
+		mainDeletionQueue.addSemaphore(frames[i].renderSemaphore);
     }
     VK_CHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &immFence));
 	mainDeletionQueue.addFence(immFence);
@@ -349,7 +345,7 @@ void VulkanEngine::InitGlobalPipelines()
 
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
     // Does not use depth for now
-	graphicsPipeline.CreateBlending(nullptr, false, VK_COMPARE_OP_LESS);
+	graphicsPipeline.CreateBlending(true, VK_COMPARE_OP_LESS);
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
 
 	// -------------------------------------------------------------------------Pipeline Layout-------------------------------------------------------------------------//
@@ -368,16 +364,18 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     VkCommandBufferBeginInfo beginInfo = vkinit::command_buffer_begin_info();
 	VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
+    VkClearValue clearValues[2];
+    clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    clearValues[1].depthStencil = { 1.0f, 0 };
+    
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = swapchain.GetRenderPass();
     renderPassInfo.framebuffer = swapchain.GetFramebuffer(imageIndex);
     renderPassInfo.renderArea.offset = { 0, 0 };
     renderPassInfo.renderArea.extent = swapchain.GetExtent();
-
-    VkClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
+    renderPassInfo.clearValueCount = 2;
+    renderPassInfo.pClearValues = clearValues;
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -542,12 +540,12 @@ void VulkanEngine::Cleanup()
 
 		vmaDestroyAllocator(allocator);
 
-
         vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyDevice(device, nullptr);
 
         vkb::destroy_debug_utils_messenger(instance, debugMessenger);
         vkDestroyInstance(instance, nullptr);
+
 
         SDL_DestroyWindow(window);
     }
@@ -558,7 +556,7 @@ void VulkanEngine::Draw()
     VK_CHECK(vkWaitForFences(device, 1, &get_current_frame().renderFence, true, UINT64_MAX));
 
     uint32_t swapchainImageIndex;
-    VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, get_current_frame().swapchainSemaphore, nullptr, &swapchainImageIndex);
+    VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, get_current_frame().renderSemaphore, nullptr, &swapchainImageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -582,11 +580,10 @@ void VulkanEngine::Draw()
     
 	RecordCommandBuffer(cmd, swapchainImageIndex);
     
-
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = { get_current_frame().swapchainSemaphore };
+    VkSemaphore waitSemaphores[] = { get_current_frame().renderSemaphore };
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
