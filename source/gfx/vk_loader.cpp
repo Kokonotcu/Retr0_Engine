@@ -6,6 +6,8 @@
 #include "vk_types.h"
 #include <glm/gtx/quaternion.hpp>
 
+#define SIMDJSON_NO_INLINE
+#undef simdjson_inline
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/parser.hpp>
 #include <fastgltf/tools.hpp>

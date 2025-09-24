@@ -3,7 +3,7 @@
 namespace Time
 {
 	namespace
-	{	
+	{
 		std::vector<std::shared_ptr<TimeTracker>> trackers;
 		float deltaTime = 0.0f;
 		auto last = std::chrono::steady_clock::now();
@@ -17,7 +17,7 @@ namespace Time
 		return tracker;
 	}
 
-	void Time::CalculateDeltaTime()
+	void CalculateDeltaTime()
 	{
 		const auto old = last;
 		last = std::chrono::steady_clock::now();

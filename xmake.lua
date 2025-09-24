@@ -13,6 +13,9 @@ if is_mode("release") then
     set_symbols("hidden")
     set_strip ("all")
     set_optimize("fastest")
+    add_cxflags("-O3", "-DNDEBUG")
+    --remove_cxflags("-march=native", "-mavx2", "-msse4.2", {force = true})
+    add_cxflags("-msse4.2", "-mpclmul")
 end
 
 
