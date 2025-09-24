@@ -54,6 +54,8 @@ void VulkanEngine::Init()
 
     //everything went fine
     isInitialized = true;
+
+	frameTimer = Time::RequestTracker(1.0f);
 }
 
 bool VulkanEngine::CheckValidationLayerSupport()
@@ -94,8 +96,8 @@ void VulkanEngine::InitVulkan()
 
     vkb::InstanceBuilder builder;
 
-    //make the vulkan instance, with basic debug features
-    auto inst_ret = builder.set_app_name("Retr0 Engine")
+    //make the vulkan instance, with basic debug features 
+    auto inst_ret = builder.set_app_name("Retr0 Engine") //Take a look at this later, might need to change for older devices
         .request_validation_layers(enableValidationLayers)
         .use_default_debug_messenger()
         .require_api_version(1, 3, 0)
@@ -122,14 +124,14 @@ void VulkanEngine::InitVulkan()
     }
 
     //vulkan 1.3 features
-    VkPhysicalDeviceVulkan13Features features{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
+    VkPhysicalDeviceVulkan13Features features{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES }; //Take a look at this later, might need to change for older devices
     features.dynamicRendering = false;
-    features.synchronization2 = true;
+	features.synchronization2 = true; // make this false if the device doesnt support it
     
     //vulkan 1.2 features
-    VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
-    features12.bufferDeviceAddress = true;
-    features12.descriptorIndexing = true;
+    VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES }; //Take a look at this later, might need to change for older devices
+    features12.bufferDeviceAddress = true; // make this false if the device doesnt support it
+    features12.descriptorIndexing = true; // make this false if the device doesnt support it
 
     //use vkbootstrap to select a gpu. 
     //We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct features
@@ -397,8 +399,10 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     // Vulkan Y-flip (keep this if you’re not using a negative viewport height)
     proj[1][1] *= -1.0f;
 
+	glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 40.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
     // If your push constants hold MVP, name it that:
-    pushConstants.worldMatrix = proj * view;
+    pushConstants.worldMatrix = proj * view * rotation;
 
 	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
 
@@ -444,11 +448,11 @@ void VulkanEngine::ImmediateSubmitQueued(std::function<void(VkCommandBuffer _cmd
     VK_CHECK(vkEndCommandBuffer(cmd));
 
     VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
-    VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, nullptr, nullptr);
+    VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, nullptr, nullptr); //Take a look at this later, might need to change for older devices
 
     // submit command buffer to the queue and execute it.
     //  _renderFence will now block until the graphic commands finish execution
-    VK_CHECK(vkQueueSubmit2(immediateQueue, 1, &submit, immFence));
+	VK_CHECK(vkQueueSubmit2(immediateQueue, 1, &submit, immFence));   //Take a look at this later, might need to change for older devices
 
     VK_CHECK(vkWaitForFences(device, 1, &immFence, true, UINT64_MAX));
 }
@@ -664,6 +668,7 @@ void VulkanEngine::Run()
             continue;
         }
 
+		Time::CalculateDeltaTime();
         Draw();
     }
 }

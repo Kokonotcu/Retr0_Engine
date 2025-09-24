@@ -23,6 +23,7 @@
 #include "resources/DeletionQueue.h"
 #include "tools/FilePathManager.h"
 #include "resources/vk_swapchain.h"
+#include "tools/Time.h"
 
 struct FrameCommander 
 {
@@ -116,5 +117,7 @@ private:
 	DeletionQueue mainDeletionQueue;
 
 	VulkanEngine* loadedEngine = nullptr;
+
+	std::shared_ptr<Time::TimeTracker> frameTimer;
 };
 
