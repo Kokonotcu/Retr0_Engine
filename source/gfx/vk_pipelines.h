@@ -91,7 +91,7 @@ public:
 
 	void CreateMultisampling();
 
-	void CreateBlending(bool depthWriteEnable, VkCompareOp op);
+	void CreateBlending(uint32_t colorBlendFlag, VkCompareOp op);
 
 	void CreatePipelineLayout();
 

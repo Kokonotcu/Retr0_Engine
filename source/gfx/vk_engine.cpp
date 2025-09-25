@@ -346,8 +346,9 @@ void VulkanEngine::InitGlobalPipelines()
      // -------------------------------------------------------------------------Multisampling Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
-    // Does not use depth for now
-	graphicsPipeline.CreateBlending(true, VK_COMPARE_OP_LESS);
+	///graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS);
+    //graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_COMPARE_OP_LESS);
+    graphicsPipeline.CreateBlending(69, VK_COMPARE_OP_LESS);
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
 
 	// -------------------------------------------------------------------------Pipeline Layout-------------------------------------------------------------------------//

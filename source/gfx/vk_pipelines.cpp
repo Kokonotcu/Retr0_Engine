@@ -121,11 +121,11 @@ void GraphicsPipeline::CreateMultisampling()
 	multisamplingInfo.alphaToOneEnable = VK_FALSE; // Optional
 }
 
-void GraphicsPipeline::CreateBlending(bool depthWriteEnable, VkCompareOp op)
+void GraphicsPipeline::CreateBlending(uint32_t colorBlendFlag, VkCompareOp op)
 {
 	depthStencilStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	depthStencilStateInfo.depthTestEnable = VK_TRUE;
-	depthStencilStateInfo.depthWriteEnable = depthWriteEnable;
+	depthStencilStateInfo.depthWriteEnable = true;
 	depthStencilStateInfo.depthCompareOp = op;
 	depthStencilStateInfo.depthBoundsTestEnable = VK_FALSE;
 	depthStencilStateInfo.stencilTestEnable = VK_FALSE;
@@ -139,17 +139,29 @@ void GraphicsPipeline::CreateBlending(bool depthWriteEnable, VkCompareOp op)
 		VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
 		VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
-	if (false) {
-		colorBlendAttachment.blendEnable = VK_TRUE;
-		colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-		colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-	}
-	else {
-		colorBlendAttachment.blendEnable = VK_FALSE;
+	switch (colorBlendFlag )
+	{
+		case VK_BLEND_FACTOR_ONE: // Additive blending
+			colorBlendAttachment.blendEnable = VK_TRUE;
+			colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+			colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+			colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+		break;
+		case VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA: // Alpha blending
+			colorBlendAttachment.blendEnable = VK_TRUE;
+			colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+			colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+			colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+			colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+			colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+			colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+		break;
+		default:
+			colorBlendAttachment.blendEnable = VK_FALSE;
+		break;
 	}
 
 	colorBlendStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;

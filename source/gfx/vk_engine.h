@@ -34,7 +34,7 @@ struct FrameCommander
 	VkFence renderFence;
 };
 
-constexpr unsigned int FRAME_OVERLAP = 2;
+constexpr unsigned int FRAME_OVERLAP = 3;
 
 class VulkanEngine {
 public:
@@ -103,11 +103,6 @@ public:
 	bool framebufferResized = false;
 	bool stopRendering{ false };
 	bool VsyncEnabled{ true };
-
-	DescriptorAllocator globalDescriptorAllocator;
-	VkDescriptorSet drawImageDescriptors;
-	VkDescriptorSetLayout drawImageDescriptorLayout;
-
 
 	//Mesh Stuff
 	std::vector<std::shared_ptr<MeshAsset>> testMeshes; //abstract this out
