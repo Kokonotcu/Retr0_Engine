@@ -26,5 +26,8 @@
 !*.bat
 !**/*.bat
 
+!*.sh
+!**/*.sh
+
 # Do not ignore self
 !**.gitignore

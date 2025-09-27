@@ -348,7 +348,7 @@ void VulkanEngine::InitGlobalPipelines()
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
 	///graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS);
     //graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_COMPARE_OP_LESS);
-    graphicsPipeline.CreateBlending(69, VK_COMPARE_OP_LESS);
+    graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS);
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
 
 	// -------------------------------------------------------------------------Pipeline Layout-------------------------------------------------------------------------//
@@ -407,12 +407,12 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 
 	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
 
-    pushConstants.vertexBuffer = testMeshes[2]->meshBuffers.vertexBufferAddress;
+    pushConstants.vertexBuffer = testMeshes[1]->meshBuffers.vertexBufferAddress;
 
     vkCmdPushConstants(commandBuffer, graphicsPipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
-    vkCmdBindIndexBuffer(commandBuffer, testMeshes[2]->meshBuffers.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(commandBuffer, testMeshes[1]->meshBuffers.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-    vkCmdDrawIndexed(commandBuffer, testMeshes[2]->surfaces[0].count, 1, testMeshes[2]->surfaces[0].startIndex, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, testMeshes[1]->surfaces[0].count, 1, testMeshes[1]->surfaces[0].startIndex, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
