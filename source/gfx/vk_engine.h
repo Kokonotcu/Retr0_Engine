@@ -53,7 +53,6 @@ public:
 	//run main loop
 	void Run();
 
-	retro::GPUMeshBuffer UploadMesh(std::span<uint32_t> indices, std::span<retro::Vertex> vertices); //abstract this out
 	void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);   
 private:
 	FrameCommander& get_current_frame() { return frames[frameNumber % FRAME_OVERLAP]; };
@@ -106,7 +105,8 @@ public:
 	int frameNumber{ 0 };
 
 	//Mesh Stuff
-	retro::GPUMeshHandle testMesh; //abstract this out
+	retro::GPUMeshHandle testMesh;
+	retro::GPUMeshHandle testMesh2;
 private:
 	bool engineDebug = true;
 

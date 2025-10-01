@@ -94,182 +94,91 @@ namespace MeshManager
 		indexHead = 0;
     }
 
+    VkBuffer GetGlobalVertexBuffer()
+    {
+        return globalVertexBuffer.buffer;
+    }
+
+    VkBuffer GetGlobalIndexBuffer()
+    {
+        return globalIndexBuffer.buffer; 
+    }
+
     retro::GPUMeshHandle LoadMeshGPU(std::filesystem::path filePath, int modelIndex)
     {
-		auto mesh = FileManager::ModelLoader::LoadMeshFromFile(filePath);
+        retro::GPUMeshHandle handle{};
+
+        // 1) Load CPU-side mesh
+        auto meshes = FileManager::ModelLoader::LoadMeshFromFile(filePath);
+
+        if (meshes.size() <= 0 || modelIndex < 0 || modelIndex >= (int)meshes.size()) {
+            fmt::print("MeshManager: invalid modelIndex or load failed: {}\n", filePath.string());
+            return handle; // empty
+        }
         
-        const size_t vertexBufferSize = mesh[modelIndex]->vertices.size() * sizeof(retro::Vertex);
-        const size_t indexBufferSize = mesh[modelIndex]->indices.size() * sizeof(uint32_t);
+        const auto& m = meshes.at(modelIndex);
+        const size_t vertexBytes = m->vertices.size() * sizeof(retro::Vertex);
+        const size_t indexBytes = m->indices.size() * sizeof(uint32_t);
 
-        retro::GPUMeshHandle newSurface;
-		newSurface.name = mesh[modelIndex]->name;
-		newSurface.submeshes = mesh[modelIndex]->submeshes;
+        // 2) Capacity check against global buffers
+        const VkDeviceSize vCap = globalVertexBuffer.info.size; // VMA alloc info size
+        const VkDeviceSize iCap = globalIndexBuffer.info.size;
+        if (vertexHead + vertexBytes > vCap || indexHead + indexBytes > iCap) {
+            fmt::print("MeshManager: out of space (need V:{} I:{}, have V:{} I:{})\n",
+                vertexBytes, indexBytes, (size_t)(vCap - vertexHead), (size_t)(iCap - indexHead));
+            return handle; // empty
+        }
 
-        //create vertex buffer
-        newSurface.meshBuffer.vertexBuffer = retro::CreateBuffer(engine->GetAllocator(), vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_GPU_ONLY);
+        // 3) Staging buffer (one-shot, merged for V+I)
+        retro::Buffer staging = retro::CreateBuffer(
+            engine->GetAllocator(),
+            vertexBytes + indexBytes,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_MEMORY_USAGE_CPU_ONLY
+        );
 
-        //find the adress of the vertex buffer
-        VkBufferDeviceAddressInfo deviceAdressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,.buffer = newSurface.meshBuffer.vertexBuffer.buffer };
-        newSurface.meshBuffer.vertexBufferAddress = vkGetBufferDeviceAddress(engine->GetDevice(), &deviceAdressInfo);
-
-        //create index buffer
-        newSurface.meshBuffer.indexBuffer = retro::CreateBuffer(engine->GetAllocator(), indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VMA_MEMORY_USAGE_GPU_ONLY);
-
-        retro::Buffer staging = retro::CreateBuffer(engine->GetAllocator(), vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
-
-        void* data = staging.allocation->GetMappedData();
-
-        // copy vertex buffer
-        memcpy(data, mesh[modelIndex]->vertices.data(), vertexBufferSize);
-        // copy index buffer
-        memcpy((char*)data + vertexBufferSize, mesh[modelIndex]->indices.data(), indexBufferSize);
+        // 4) Fill staging directly
+        uint8_t* mapped = static_cast<uint8_t*>(staging.allocation->GetMappedData());
+        memcpy(mapped + 0, m->vertices.data(), vertexBytes);
+        memcpy(mapped + vertexBytes, m->indices.data(), indexBytes);
 
         engine->ImmediateSubmit([&](VkCommandBuffer cmd) {
-            VkBufferCopy vertexCopy{ 0 };
-            vertexCopy.dstOffset = 0;
-            vertexCopy.srcOffset = 0;
-            vertexCopy.size = vertexBufferSize;
+            // vertices → global vertex buffer
+            VkBufferCopy vCopy{};
+            vCopy.srcOffset = 0;
+            vCopy.dstOffset = vertexHead;
+            vCopy.size = vertexBytes;
+            vkCmdCopyBuffer(cmd, staging.buffer, globalVertexBuffer.buffer, 1, &vCopy);
 
-            vkCmdCopyBuffer(cmd, staging.buffer, newSurface.meshBuffer.vertexBuffer.buffer, 1, &vertexCopy);
-
-            VkBufferCopy indexCopy{ 0 };
-            indexCopy.dstOffset = 0;
-            indexCopy.srcOffset = vertexBufferSize;
-            indexCopy.size = indexBufferSize;
-
-            vkCmdCopyBuffer(cmd, staging.buffer, newSurface.meshBuffer.indexBuffer.buffer, 1, &indexCopy);
+            // indices → global index buffer
+            VkBufferCopy iCopy{};
+            iCopy.srcOffset = vertexBytes;
+            iCopy.dstOffset = indexHead;
+            iCopy.size = indexBytes;
+            vkCmdCopyBuffer(cmd, staging.buffer, globalIndexBuffer.buffer, 1, &iCopy);
             });
 
-        retro::DestroyBuffer(engine->GetAllocator(), staging);
-        mesh.clear();
+        // 6) Build the handle (offsets/counts)
+        handle.name = m->name;
+        handle.submeshes = m->submeshes;       // NOTE: these startIndex values are local to this mesh
+        handle.vertexOffset = vertexHead;
+        handle.indexOffset = indexHead;
+        handle.indexCount = static_cast<uint32_t>(m->indices.size());
 
-        return newSurface;
+        // BDA base address for shader fetch
+        if (engine->bufferDeviceAddress != 0) 
+        {
+            handle.vertexBufferAddress = globalVertexAddress + handle.vertexOffset;
+        }
+
+        // 7) Advance heads
+        vertexHead += vertexBytes;
+        indexHead += indexBytes;
+
+        // 8) Cleanup staging and CPU vectors
+        retro::DestroyBuffer(engine->GetAllocator(), staging);
+		meshes.clear();
+
+		return handle;
     }
 }
-
-
-//std::optional<std::vector<std::shared_ptr<retro::GPUMeshHandle>>> loadGltfMeshes(VulkanEngine* engine, std::filesystem::path filePath)
-//{
-//#ifdef DEBUG
-//	fmt::print("Loading GLTF: {}", filePath.string() + "\n");
-//#endif // DEBUG
-//
-//
-//    fastgltf::GltfDataBuffer data;
-//    data.loadFromFile(filePath);
-//
-//    constexpr auto gltfOptions = fastgltf::Options::LoadGLBBuffers
-//        | fastgltf::Options::LoadExternalBuffers;
-//
-//    fastgltf::Asset gltf;
-//    fastgltf::Parser parser{};
-//
-//    auto load = parser.loadBinaryGLTF(&data, filePath.parent_path(), gltfOptions);
-//    if (load) {
-//        gltf = std::move(load.get());
-//    }
-//    else {
-//        fmt::print("Failed to load glTF: {}", fastgltf::to_underlying(load.error()) + "\n");
-//        return {};
-//    }
-//
-//    std::vector<std::shared_ptr<retro::GPUMeshHandle>> meshes;
-//
-//    // use the same vectors for all meshes so that the memory doesnt reallocate as
-//    // often
-//    std::vector<uint32_t> indices;
-//    std::vector<retro::Vertex> vertices;
-//    for (fastgltf::Mesh& mesh : gltf.meshes) {
-//        retro::GPUMeshHandle newmesh;
-//
-//        newmesh.name = mesh.name;
-//
-//        // clear the mesh arrays each mesh, we dont want to merge them by error
-//        indices.clear();
-//        vertices.clear();
-//
-//        for (auto&& p : mesh.primitives) {
-//            retro::Submesh newSurface;
-//            newSurface.startIndex = (uint32_t)indices.size();
-//            newSurface.count = (uint32_t)gltf.accessors[p.indicesAccessor.value()].count;
-//
-//            size_t initial_vtx = vertices.size();
-//
-//            // load indexes
-//            {
-//                fastgltf::Accessor& indexaccessor = gltf.accessors[p.indicesAccessor.value()];
-//                indices.reserve(indices.size() + indexaccessor.count);
-//
-//                fastgltf::iterateAccessor<std::uint32_t>(gltf, indexaccessor,
-//                    [&](std::uint32_t idx) {
-//                        indices.push_back(idx + initial_vtx);
-//                    });
-//            }
-//
-//            // load vertex positions
-//            {
-//                fastgltf::Accessor& posAccessor = gltf.accessors[p.findAttribute("POSITION")->second];
-//                vertices.resize(vertices.size() + posAccessor.count);
-//
-//                fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, posAccessor,
-//                    [&](glm::vec3 v, size_t index) {
-//                        retro::Vertex newvtx;
-//                        newvtx.position = v;
-//                        newvtx.normal = { 1, 0, 0 };
-//                        newvtx.color = glm::vec4{ 1.f };
-//                        newvtx.uv_x = 0;
-//                        newvtx.uv_y = 0;
-//                        vertices[initial_vtx + index] = newvtx;
-//                    });
-//            }
-//
-//            // load vertex normals
-//            auto normals = p.findAttribute("NORMAL");
-//            if (normals != p.attributes.end()) {
-//
-//                fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, gltf.accessors[(*normals).second],
-//                    [&](glm::vec3 v, size_t index) {
-//                        vertices[initial_vtx + index].normal = v;
-//                    });
-//            }
-//
-//            // load UVs
-//            auto uv = p.findAttribute("TEXCOORD_0");
-//            if (uv != p.attributes.end()) {
-//
-//                fastgltf::iterateAccessorWithIndex<glm::vec2>(gltf, gltf.accessors[(*uv).second],
-//                    [&](glm::vec2 v, size_t index) {
-//                        vertices[initial_vtx + index].uv_x = v.x;
-//                        vertices[initial_vtx + index].uv_y = v.y;
-//                    });
-//            }
-//
-//            // load vertex colors
-//            auto colors = p.findAttribute("COLOR_0");
-//            if (colors != p.attributes.end()) {
-//
-//                fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, gltf.accessors[(*colors).second],
-//                    [&](glm::vec4 v, size_t index) {
-//                        vertices[initial_vtx + index].color = v;
-//                    });
-//            }
-//            newmesh.submeshes.push_back(newSurface);
-//        }
-//
-//        // display the vertex normals
-//        constexpr bool OverrideColors = true;
-//        if (OverrideColors) {
-//            for (retro::Vertex& vtx : vertices) {
-//                vtx.color = glm::vec4(vtx.normal, 1.f);
-//            }
-//        }
-//        //
-//        newmesh.meshBuffer = engine->UploadMesh(indices, vertices);
-//        //
-//        meshes.emplace_back(std::make_shared<retro::GPUMeshHandle>(std::move(newmesh)));
-//    }
-//
-//    return meshes;
-//}

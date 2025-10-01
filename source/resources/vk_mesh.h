@@ -37,9 +37,9 @@ namespace retro
         // where this mesh lives inside the mega buffers:
         VkDeviceSize vertexOffset = 0; // bytes
         VkDeviceSize indexOffset = 0; // bytes
-        uint32_t     indexCount = 0;
+        uint32_t          indexCount = 0;
 
-        retro::GPUMeshBuffer meshBuffer;
+        VkDeviceAddress vertexBufferAddress;
     };
 
     struct CPUMesh : public Mesh 

@@ -391,7 +391,7 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 	VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
     VkClearValue clearValues[2];
-    clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    clearValues[0].color = { {0.0f, 0.0f, 0.32f, 1.0f} };
     clearValues[1].depthStencil = { 1.0f, 0 };
     
     VkRenderPassBeginInfo renderPassInfo{};
@@ -424,17 +424,23 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     proj[1][1] *= -1.0f;
 
 	glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(0.1f, 1.0f, 0.0f));
-
     // If your push constants hold MVP, name it that:
     pushConstants.worldMatrix = proj * view * rotation;
 
 	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
 
-    pushConstants.vertexBuffer = testMesh.meshBuffer.vertexBufferAddress;
-
+    pushConstants.vertexBuffer = testMesh.vertexBufferAddress;
     vkCmdPushConstants(commandBuffer, graphicsPipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::GPUDrawPushConstants), &pushConstants);
-    vkCmdBindIndexBuffer(commandBuffer, testMesh.meshBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(commandBuffer, MeshManager::GetGlobalIndexBuffer(), testMesh.indexOffset, VK_INDEX_TYPE_UINT32);
     vkCmdDrawIndexed(commandBuffer, testMesh.submeshes[0].count, 1, testMesh.submeshes[0].startIndex, 0, 0);
+
+    rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(1.0f, 0.2f, 0.0f));
+    pushConstants.worldMatrix = proj * view * rotation;
+
+    pushConstants.vertexBuffer = testMesh2.vertexBufferAddress;
+    vkCmdPushConstants(commandBuffer, graphicsPipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::GPUDrawPushConstants), &pushConstants);
+    vkCmdBindIndexBuffer(commandBuffer, MeshManager::GetGlobalIndexBuffer(), testMesh2.indexOffset, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(commandBuffer, testMesh2.submeshes[0].count, 1, testMesh2.submeshes[0].startIndex, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 	VK_CHECK(vkEndCommandBuffer(commandBuffer));
@@ -443,9 +449,7 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 void VulkanEngine::InitDefaultMesh()
 {
 	testMesh = MeshManager::LoadMeshGPU(FileManager::path::GetAssetPath("basicmesh.glb"),1);
-
-	mainDeletionQueue.addBuffer(testMesh.meshBuffer.indexBuffer.buffer, testMesh.meshBuffer.indexBuffer.allocation);
-    mainDeletionQueue.addBuffer(testMesh.meshBuffer.vertexBuffer.buffer, testMesh.meshBuffer.vertexBuffer.allocation);
+    testMesh2 = MeshManager::LoadMeshGPU(FileManager::path::GetAssetPath("basicmesh.glb"), 2);
 }
 
 void VulkanEngine::ImmediateSubmit(std::function<void(VkCommandBuffer _cmd)>&& function)

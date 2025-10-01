@@ -13,19 +13,6 @@ namespace retro
         VmaAllocationInfo info;
     };
 
-    struct MeshBuffer 
-    {
-        Buffer indexBuffer;          // Get rid of these per mesh buffers and put all meshes into mega global buffer
-        Buffer vertexBuffer;         // Get rid of these per mesh buffers and put all meshes into mega global buffer
-    };
-
-    // holds the resources needed for a mesh
-    struct GPUMeshBuffer : public MeshBuffer
-    {
-        VkDeviceAddress vertexBufferAddress;
-    };
-
-
     retro::Buffer CreateBuffer(VmaAllocator allocator, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
     void DestroyBuffer(VmaAllocator allocator, const retro::Buffer& buffer);
 }

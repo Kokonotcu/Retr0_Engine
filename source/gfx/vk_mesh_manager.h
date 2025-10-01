@@ -17,6 +17,9 @@ namespace MeshManager
     void Init(VulkanEngine* engine,
         size_t maxVertexBytes, size_t maxIndexBytes);
 	void ClearBuffers();
+
+    VkBuffer GetGlobalVertexBuffer();//
+    VkBuffer GetGlobalIndexBuffer(); // 
     
 	// Load a mesh from a file, return create a CPU mesh or a GPU mesh handle
     std::shared_ptr<retro::CPUMesh> LoadMeshCPU(std::filesystem::path filePath);
