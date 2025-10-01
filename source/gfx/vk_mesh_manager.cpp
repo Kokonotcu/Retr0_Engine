@@ -1,9 +1,9 @@
-﻿#include <gfx/vk_loader.h>
+﻿#include <gfx/vk_mesh_manager.h>
 #include "stb_image.h"
 
 #include "vk_engine.h"
 #include "vk_initializers.h"
-#include "vk_types.h"
+#include "vk_debug.h"
 #include <glm/gtx/quaternion.hpp>
 
 #define SIMDJSON_NO_INLINE
@@ -12,9 +12,79 @@
 #include <fastgltf/parser.hpp>
 #include <fastgltf/tools.hpp>
 
-std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngine* engine, std::filesystem::path filePath)
+
+namespace MeshManager
 {
+    namespace 
+    {
+		VulkanEngine* engine = nullptr;
+
+        // the big buffers:
+		VkDeviceAddress globalVertexAddress = 0;
+        retro::Buffer globalVertexBuffer;
+        retro::Buffer globalIndexBuffer;
+
+        // very dumb bump allocators (start at 0, move forward):
+        VkDeviceSize vertexHead = 0; 
+        VkDeviceSize indexHead = 0;
+
+        // helper to copy CPU→staging→bigBuffer
+        void Upload(VkBuffer dst, VkDeviceSize dstOffset,
+            const void* src, size_t sizeBytes);
+
+
+    }
+
+
+    void Init(VulkanEngine* _engine, size_t maxVertexBytes, size_t maxIndexBytes)
+    {
+        engine = _engine;
+        // create the big buffers:
+
+        if (engine->bufferDeviceAddress)
+        {
+            // --- BDA path ---
+            globalVertexBuffer = retro::CreateBuffer(engine->GetAllocator(), maxVertexBytes,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                VMA_MEMORY_USAGE_GPU_ONLY);
+            globalIndexBuffer = retro::CreateBuffer(engine->GetAllocator(), maxIndexBytes,
+                VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VMA_MEMORY_USAGE_GPU_ONLY);
+
+            // Query device address
+            VkBufferDeviceAddressInfo addrInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
+            addrInfo.buffer = globalVertexBuffer.buffer;
+            globalVertexAddress = vkGetBufferDeviceAddress(engine->GetDevice(), &addrInfo);
+        }
+        else
+        {
+            // --- Fallback path (no BDA) ---
+            globalVertexBuffer = retro::CreateBuffer(engine->GetAllocator(), maxVertexBytes,
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |  // classic vertex binding
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VMA_MEMORY_USAGE_GPU_ONLY);
+
+            globalIndexBuffer = retro::CreateBuffer(engine->GetAllocator(), maxIndexBytes,
+                VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VMA_MEMORY_USAGE_GPU_ONLY);
+
+            // No device address in this path
+            globalVertexAddress = 0;
+        }
+        
+        vertexHead = 0;
+		indexHead = 0;
+    }
+}
+
+
+std::optional<std::vector<std::shared_ptr<retro::GPUMeshHandle>>> loadGltfMeshes(VulkanEngine* engine, std::filesystem::path filePath)
+{
+#ifdef DEBUG
 	fmt::print("Loading GLTF: {}", filePath.string() + "\n");
+#endif // DEBUG
+
 
     fastgltf::GltfDataBuffer data;
     data.loadFromFile(filePath);
@@ -34,14 +104,14 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngi
         return {};
     }
 
-    std::vector<std::shared_ptr<MeshAsset>> meshes;
+    std::vector<std::shared_ptr<retro::GPUMeshHandle>> meshes;
 
     // use the same vectors for all meshes so that the memory doesnt reallocate as
     // often
     std::vector<uint32_t> indices;
-    std::vector<Vertex> vertices;
+    std::vector<retro::Vertex> vertices;
     for (fastgltf::Mesh& mesh : gltf.meshes) {
-        MeshAsset newmesh;
+        retro::GPUMeshHandle newmesh;
 
         newmesh.name = mesh.name;
 
@@ -50,7 +120,7 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngi
         vertices.clear();
 
         for (auto&& p : mesh.primitives) {
-            GeoSurface newSurface;
+            retro::Submesh newSurface;
             newSurface.startIndex = (uint32_t)indices.size();
             newSurface.count = (uint32_t)gltf.accessors[p.indicesAccessor.value()].count;
 
@@ -74,7 +144,7 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngi
 
                 fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, posAccessor,
                     [&](glm::vec3 v, size_t index) {
-                        Vertex newvtx;
+                        retro::Vertex newvtx;
                         newvtx.position = v;
                         newvtx.normal = { 1, 0, 0 };
                         newvtx.color = glm::vec4{ 1.f };
@@ -114,20 +184,20 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGltfMeshes(VulkanEngi
                         vertices[initial_vtx + index].color = v;
                     });
             }
-            newmesh.surfaces.push_back(newSurface);
+            newmesh.submeshes.push_back(newSurface);
         }
 
         // display the vertex normals
         constexpr bool OverrideColors = true;
         if (OverrideColors) {
-            for (Vertex& vtx : vertices) {
+            for (retro::Vertex& vtx : vertices) {
                 vtx.color = glm::vec4(vtx.normal, 1.f);
             }
         }
         //
-        newmesh.meshBuffers = engine->UploadMesh(indices, vertices);
+        newmesh.meshBuffer = engine->UploadMesh(indices, vertices);
         //
-        meshes.emplace_back(std::make_shared<MeshAsset>(std::move(newmesh)));
+        meshes.emplace_back(std::make_shared<retro::GPUMeshHandle>(std::move(newmesh)));
     }
 
     return meshes;

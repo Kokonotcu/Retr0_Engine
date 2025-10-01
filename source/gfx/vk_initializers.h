@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <gfx/vk_types.h>
+#include <gfx/vk_debug.h>
 
 namespace vkinit {
 //> init_cmd
@@ -15,8 +15,8 @@ VkFenceCreateInfo fence_create_info(VkFenceCreateFlags flags = 0);
 
 VkSemaphoreCreateInfo semaphore_create_info(VkSemaphoreCreateFlags flags = 0);
 
-VkSubmitInfo2 submit_info(VkCommandBufferSubmitInfo* cmd, VkSemaphoreSubmitInfo* signalSemaphoreInfo,
-    VkSemaphoreSubmitInfo* waitSemaphoreInfo);
+VkSubmitInfo submit_info(VkCommandBuffer* cmd, VkSemaphore* signalSemaphoreInfo,
+    VkSemaphore* waitSemaphoreInfo);
 VkPresentInfoKHR present_info();
 
 VkRenderingAttachmentInfo attachment_info(VkImageView view, VkClearValue* clear, VkImageLayout layout /*= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL*/);

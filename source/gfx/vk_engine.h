@@ -1,12 +1,14 @@
 ﻿#pragma once
-#include <gfx/vk_loader.h>
-#include <gfx/vk_types.h>
-#include <gfx/vk_images.h>
+#include <gfx/vk_mesh_manager.h>
+#include <gfx/vk_debug.h>
 #include <gfx/vk_initializers.h>
-#include <gfx/vk_types.h>
 #include <gfx/vk_pipelines.h>
 
 #include <resources/vk_descriptors.h>
+#include <resources/vk_images.h>
+#include <resources/vk_buffer.h>
+#include <resources/vk_push_constants.h>
+#include <resources/vk_mesh.h>
 
 #include <chrono>
 #include <thread>
@@ -21,8 +23,8 @@
 
 #include "tools/ShaderCompiler.h"
 #include "resources/DeletionQueue.h"
-#include "tools/FilePathManager.h"
-#include "resources/vk_swapchain.h"
+#include "tools/FileManager.h"
+#include "gfx/vk_swapchain.h"
 #include "tools/Time.h"
 
 struct FrameCommander 
@@ -40,6 +42,8 @@ class VulkanEngine {
 public:
 	VulkanEngine() = default;
 	VulkanEngine& Get() { return *this; }
+	VmaAllocator GetAllocator() { return allocator; }
+	VkDevice GetDevice() { return device; }
 
 	//initializes everything in the engine
 	void Init();
@@ -50,9 +54,11 @@ public:
 	//run main loop
 	void Run();
 
-	FrameCommander& get_current_frame() { return frames[frameNumber % FRAME_OVERLAP]; };
-	GPUMeshBuffers UploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices); //abstract this out
+	retro::GPUMeshBuffer UploadMesh(std::span<uint32_t> indices, std::span<retro::Vertex> vertices); //abstract this out
+	void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);   
 private:
+	FrameCommander& get_current_frame() { return frames[frameNumber % FRAME_OVERLAP]; };
+
 	void InitVulkan();
 	bool CheckValidationLayerSupport();
 	
@@ -66,11 +72,6 @@ private:
 	void InitDefaultMesh();
 
 	//submit a function to be executed immediately
-	void ImmediateSubmitQueued(std::function<void(VkCommandBuffer cmd)>&& function);   
-																			 
-	//Utility functions
-	AllocatedBuffer CreateBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage); //abstract this out
-	void DestroyBuffer(const AllocatedBuffer& buffer); //abstract this out
 public:
 	///////////////////////////////////////////////////////////////
 	struct SDL_Window* window{ nullptr };
@@ -98,15 +99,17 @@ public:
 	Swapchain swapchain;
 	GraphicsPipeline graphicsPipeline;
 
+	bool bufferDeviceAddress;
 	bool isInitialized{ false };
-	int frameNumber{ 0 };
 	bool framebufferResized = false;
 	bool stopRendering{ false };
 	bool VsyncEnabled{ true };
+	int frameNumber{ 0 };
 
 	//Mesh Stuff
-	std::vector<std::shared_ptr<MeshAsset>> testMeshes; //abstract this out
+	std::vector<std::shared_ptr<retro::GPUMeshHandle>> testMeshes; //abstract this out
 private:
+	bool engineDebug = true;
 
 	FrameCommander frames[FRAME_OVERLAP];
 	DeletionQueue mainDeletionQueue;

@@ -6,7 +6,7 @@ namespace ShaderCompiler
 {
 	namespace
 	{
-		enum extensionType 
+		enum ShaderExtension
 		{
 			COMPUTE,
 			VERTEX,
@@ -18,16 +18,16 @@ namespace ShaderCompiler
 		int determineExtension(std::string extension) 
 		{
 			if (extension == ".comp" )
-				return extensionType::COMPUTE;
+				return ShaderExtension::COMPUTE;
 			else if (extension == ".frag")
-				return extensionType::FRAGMENT;
+				return ShaderExtension::FRAGMENT;
 			else if (extension == ".vert")
-				return extensionType::VERTEX;
+				return ShaderExtension::VERTEX;
 			else if (extension == ".spv")
-				return extensionType::SPIRV;
+				return ShaderExtension::SPIRV;
 
 			throw("File extension isn't supported.");
-			return extensionType::INVALID;
+			return ShaderExtension::INVALID;
 		}
 
 		bool compileShader(const fs::path& sourcePath, const fs::path& spvPath, shaderc_shader_kind kind)
@@ -106,17 +106,17 @@ namespace ShaderCompiler
 				{
 					switch (determineExtension(entry.path().extension().string()))
 					{
-					case extensionType::COMPUTE:
+					case ShaderExtension::COMPUTE:
 						LoadCompFromDir(entry.path());
 						break;
 
-					case extensionType::FRAGMENT:
+					case ShaderExtension::FRAGMENT:
 						LoadFragFromDir(entry.path());
 						break;
-					case extensionType::VERTEX:
+					case ShaderExtension::VERTEX:
 						LoadVertFromDir(entry.path());
 						break;
-					case extensionType::SPIRV:
+					case ShaderExtension::SPIRV:
 						LoadSpvFromDir(entry.path());
 						break;
 

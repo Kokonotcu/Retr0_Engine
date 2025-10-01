@@ -1,5 +1,6 @@
 #pragma once
-#include <gfx/vk_types.h>
+#include <resources/vk_images.h>
+#include <gfx/vk_debug.h>
 #include <VkBootstrap.h>
 #include <resources/DeletionQueue.h>
 
@@ -80,8 +81,8 @@ private:
 	VkRenderPass renderPass;
 	std::vector<VkFramebuffer> framebuffers;
 	
-	AllocatedImage drawImage;
-	std::vector<AllocatedImage> depthImages;
+	retro::Image drawImage;
+	std::vector<retro::Image> depthImages;
 	VkExtent2D drawExtent;
 
 	std::vector<VkSemaphore> imagePresentSemaphores;

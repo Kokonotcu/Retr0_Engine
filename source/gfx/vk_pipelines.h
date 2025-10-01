@@ -1,8 +1,8 @@
 ﻿#pragma once 
 #include <gfx/vk_initializers.h>
-#include <gfx/vk_types.h>
+#include <gfx/vk_debug.h>
 
-#include <tools/FilePathManager.h>
+#include <tools/FileManager.h>
 #include <tools/ShaderCompiler.h>
 
 class GraphicsPipeline
@@ -34,7 +34,7 @@ public:
 	template<typename vertexBufferType>
 	void CreateVertexShaderModule(const char* fileName)
 	{
-		if (!ShaderCompiler::LoadShaderModule(FilePathManager::GetShaderPath(fileName).string(), device, &vertexShader))
+		if (!ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(fileName).string(), device, &vertexShader))
 		{
 			fmt::print("Error when building the vertex shader \n");
 		}
@@ -53,7 +53,7 @@ public:
 	template<typename fragmentBufferType>
 	void CreateFragmentShaderModule(const char* filePath)
 	{
-		if (!ShaderCompiler::LoadShaderModule(FilePathManager::GetShaderPath(filePath).string(), device, &fragmentShader))
+		if (!ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(filePath).string(), device, &fragmentShader))
 		{
 			fmt::print("Error when building the fragment shader \n");
 		}
@@ -91,7 +91,7 @@ public:
 
 	void CreateMultisampling();
 
-	void CreateBlending(uint32_t colorBlendFlag, VkCompareOp op);
+	void CreateBlending(uint32_t colorBlendFlag, VkCompareOp depthOperation);
 
 	void CreatePipelineLayout();
 

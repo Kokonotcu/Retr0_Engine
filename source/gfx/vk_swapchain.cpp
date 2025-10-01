@@ -1,4 +1,4 @@
-#include "resources/vk_swapchain.h"
+#include "gfx/vk_swapchain.h"
 
 void Swapchain::CreateSwapchain(uint32_t width, uint32_t height, bool Vsync)
 {
@@ -229,7 +229,7 @@ void Swapchain::createDepthResources()
     depthImages.resize(images.size());
     for (size_t i = 0; i < images.size(); ++i)
     {
-        AllocatedImage& di = depthImages[i];
+        retro::Image& di = depthImages[i];
 		di.imageFormat = depthFormat;
         di.imageExtent = { extent.width, extent.height, 1 };
 

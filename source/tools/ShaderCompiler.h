@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <fmt/core.h>
 #include <vulkan/vulkan.h>
-#include <gfx/vk_types.h>
+#include <gfx/vk_debug.h>
 
 namespace ShaderCompiler
 {	

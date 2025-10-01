@@ -20,7 +20,6 @@ const std::vector<const char*> validationLayers = {
     const bool enableValidationLayers = false;
  #endif
 
-
 void VulkanEngine::Init()
 {
     // We initialize SDL and create a window with it. 
@@ -100,7 +99,7 @@ void VulkanEngine::InitVulkan()
     auto inst_ret = builder.set_app_name("Retr0 Engine") //Take a look at this later, might need to change for older devices
         .request_validation_layers(enableValidationLayers)
         .use_default_debug_messenger()
-        .require_api_version(1, 3, 0)
+        .desire_api_version(1, 3, 0)
         .build();
 
 #ifdef DEBUG
@@ -117,33 +116,50 @@ void VulkanEngine::InitVulkan()
     instance = vkbInst.instance;
     debugMessenger = vkbInst.debug_messenger;
 
-    if (!SDL_Vulkan_CreateSurface(window, instance, NULL, &surface)) 
+    if (!SDL_Vulkan_CreateSurface(window, instance, NULL, &surface))
     {
 		fmt::print("failed to create surface: {}\n", SDL_GetError());
         return;
     }
 
-    //vulkan 1.3 features
-    VkPhysicalDeviceVulkan13Features features{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES }; //Take a look at this later, might need to change for older devices
-    features.dynamicRendering = false;
-	features.synchronization2 = true; // make this false if the device doesnt support it
-    
-    //vulkan 1.2 features
-    VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES }; //Take a look at this later, might need to change for older devices
-    features12.bufferDeviceAddress = true; // make this false if the device doesnt support it
-    features12.descriptorIndexing = true; // make this false if the device doesnt support it
+    uint32_t instanceVersion = 0;
+    vkEnumerateInstanceVersion(&instanceVersion);
 
-    //use vkbootstrap to select a gpu. 
-    //We want a gpu that can write to the SDL surface and supports vulkan 1.3 with the correct features
+    uint32_t major = VK_VERSION_MAJOR(instanceVersion);
+    uint32_t minor = VK_VERSION_MINOR(instanceVersion);
+    uint32_t patch = VK_VERSION_PATCH(instanceVersion);
+
     vkb::PhysicalDeviceSelector selector{ vkbInst };
 
-    auto phy_ret = selector
-        .set_minimum_version(1, 3)
-        .set_required_features_13(features)
-        .set_required_features_12(features12)
-        .set_surface(surface)
-        .select();
+    vkb::Result<vkb::PhysicalDevice>  phy_ret{ std::error_code()};
+    if ((major > 1) || (major ==1 && minor >= 2))
+    {
+        //vulkan 1.2 features
+        VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES }; //Take a look at this later, might need to change for older devices
+        features12.bufferDeviceAddress = true; // make this false if the device doesnt support it
+        features12.descriptorIndexing = true; // make this false if the device doesnt support it
 
+		bufferDeviceAddress = features12.bufferDeviceAddress;
+
+        phy_ret = selector
+            .set_minimum_version(1, 2)
+            .set_required_features_12(features12)
+            .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
+			.set_surface(surface)
+            .select();
+    }
+    else
+    {
+		bufferDeviceAddress = false;
+
+        phy_ret = selector
+            .set_minimum_version(1, 0)
+            .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
+            .set_surface(surface)
+            .select();
+    }
+
+    
 #ifdef DEBUG
     if (!phy_ret)
     {
@@ -154,10 +170,10 @@ void VulkanEngine::InitVulkan()
 
 	vkb::PhysicalDevice physicalDevice = phy_ret.value();
 
-
     //create the final vulkan device
     vkb::DeviceBuilder deviceBuilder{ physicalDevice };
     auto dev_ret = deviceBuilder.build();
+
 #ifdef DEBUG
     if (!dev_ret)
     {
@@ -195,7 +211,7 @@ void VulkanEngine::InitVulkan()
 	immediateQueue = iq_ret.value();
 
 #ifdef DEBUG
-    if (!gqi_ret)
+    if ( !gqi_ret)
     {
 		fmt::print("failed to get graphics queue index: {}\n", gqi_ret.error().message());
 		return;
@@ -219,6 +235,13 @@ void VulkanEngine::InitVulkan()
     vmaCreateAllocator(&allocatorInfo, &allocator);
 
     mainDeletionQueue.init(device, allocator);
+
+#ifdef DEBUG
+    VkPhysicalDeviceProperties props{};
+    vkGetPhysicalDeviceProperties(chosenGPU, &props);
+
+    fmt::print("Vulkan Instance Version: {}.{}.{}\nSelected GPU: {}\nType: {}  (1=integrated, 2=discrete)\n", major, minor, patch, props.deviceName, (int)props.deviceType);
+#endif // DEBUG
 }
 
 void VulkanEngine::InitCommands()
@@ -321,7 +344,7 @@ void VulkanEngine::InitGlobalPipelines()
 	graphicsPipeline.SetDevice(device);
 
     // -------------------------------------------------------------------------Vertex and Fragment Shader Stage-------------------------------------------------------------------------//
-    graphicsPipeline.CreateVertexShaderModule<GPUDrawPushConstants>("pushed_triangle.vert.spv");
+    graphicsPipeline.CreateVertexShaderModule<retro::GPUDrawPushConstants>("pushed_triangle.vert.spv");
     graphicsPipeline.CreateFragmentShaderModule("hardcoded_triangle_red.frag.spv");
     // -------------------------------------------------------------------------Vertex and Fragment Shader Stage-------------------------------------------------------------------------//
 
@@ -348,7 +371,7 @@ void VulkanEngine::InitGlobalPipelines()
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
 	///graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS);
     //graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_COMPARE_OP_LESS);
-    graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS);
+    graphicsPipeline.CreateBlending(69, VK_COMPARE_OP_LESS);
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
 
 	// -------------------------------------------------------------------------Pipeline Layout-------------------------------------------------------------------------//
@@ -384,7 +407,7 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline.GetPipeline());
 
-    GPUDrawPushConstants pushConstants;
+    retro::GPUDrawPushConstants pushConstants;
 
     // View: camera at (0,0,5) looking at origin
     glm::mat4 view = glm::lookAt(
@@ -407,33 +430,31 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 
 	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
 
-    pushConstants.vertexBuffer = testMeshes[1]->meshBuffers.vertexBufferAddress;
+    pushConstants.vertexBuffer = testMeshes[1]->meshBuffer.vertexBufferAddress;
 
-    vkCmdPushConstants(commandBuffer, graphicsPipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
-    vkCmdBindIndexBuffer(commandBuffer, testMeshes[1]->meshBuffers.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-
-    vkCmdDrawIndexed(commandBuffer, testMeshes[1]->surfaces[0].count, 1, testMeshes[1]->surfaces[0].startIndex, 0, 0);
+    vkCmdPushConstants(commandBuffer, graphicsPipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::GPUDrawPushConstants), &pushConstants);
+    vkCmdBindIndexBuffer(commandBuffer, testMeshes[1]->meshBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(commandBuffer, testMeshes[1]->submeshes[0].count, 1, testMeshes[1]->submeshes[0].startIndex, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
-
 	VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
 void VulkanEngine::InitDefaultMesh()
 {
-    testMeshes = loadGltfMeshes(this, FilePathManager::GetAssetPath("basicmesh.glb")).value();
+    testMeshes = loadGltfMeshes(this, FileManager::path::GetAssetPath("basicmesh.glb")).value();
 
-	mainDeletionQueue.addBuffer(testMeshes[0]->meshBuffers.indexBuffer.buffer, testMeshes[0]->meshBuffers.indexBuffer.allocation);
-    mainDeletionQueue.addBuffer(testMeshes[0]->meshBuffers.vertexBuffer.buffer, testMeshes[0]->meshBuffers.vertexBuffer.allocation);
+	mainDeletionQueue.addBuffer(testMeshes[0]->meshBuffer.indexBuffer.buffer, testMeshes[0]->meshBuffer.indexBuffer.allocation);
+    mainDeletionQueue.addBuffer(testMeshes[0]->meshBuffer.vertexBuffer.buffer, testMeshes[0]->meshBuffer.vertexBuffer.allocation);
 
-    mainDeletionQueue.addBuffer(testMeshes[1]->meshBuffers.indexBuffer.buffer, testMeshes[1]->meshBuffers.indexBuffer.allocation);
-    mainDeletionQueue.addBuffer(testMeshes[1]->meshBuffers.vertexBuffer.buffer, testMeshes[1]->meshBuffers.vertexBuffer.allocation);
+    mainDeletionQueue.addBuffer(testMeshes[1]->meshBuffer.indexBuffer.buffer, testMeshes[1]->meshBuffer.indexBuffer.allocation);
+    mainDeletionQueue.addBuffer(testMeshes[1]->meshBuffer.vertexBuffer.buffer, testMeshes[1]->meshBuffer.vertexBuffer.allocation);
 
-    mainDeletionQueue.addBuffer(testMeshes[2]->meshBuffers.indexBuffer.buffer, testMeshes[2]->meshBuffers.indexBuffer.allocation);
-    mainDeletionQueue.addBuffer(testMeshes[2]->meshBuffers.vertexBuffer.buffer, testMeshes[2]->meshBuffers.vertexBuffer.allocation);
+    mainDeletionQueue.addBuffer(testMeshes[2]->meshBuffer.indexBuffer.buffer, testMeshes[2]->meshBuffer.indexBuffer.allocation);
+    mainDeletionQueue.addBuffer(testMeshes[2]->meshBuffer.vertexBuffer.buffer, testMeshes[2]->meshBuffer.vertexBuffer.allocation);
 }
 
-void VulkanEngine::ImmediateSubmitQueued(std::function<void(VkCommandBuffer _cmd)>&& function)
+void VulkanEngine::ImmediateSubmit(std::function<void(VkCommandBuffer _cmd)>&& function)
 {
     VK_CHECK(vkResetFences(device, 1, &immFence));
     VK_CHECK(vkResetCommandBuffer(immCommandBuffer, 0));
@@ -448,51 +469,24 @@ void VulkanEngine::ImmediateSubmitQueued(std::function<void(VkCommandBuffer _cmd
 
     VK_CHECK(vkEndCommandBuffer(cmd));
 
-    VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
-    VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, nullptr, nullptr); //Take a look at this later, might need to change for older devices
+    VkSubmitInfo submit = vkinit::submit_info(&cmd, nullptr, nullptr); //Take a look at this later, might need to change for older devices
 
     // submit command buffer to the queue and execute it.
     //  _renderFence will now block until the graphic commands finish execution
-	VK_CHECK(vkQueueSubmit2(immediateQueue, 1, &submit, immFence));   //Take a look at this later, might need to change for older devices
+	VK_CHECK(vkQueueSubmit(immediateQueue, 1, &submit, immFence));   //Take a look at this later, might need to change for older devices
 
     VK_CHECK(vkWaitForFences(device, 1, &immFence, true, UINT64_MAX));
 }
 
-AllocatedBuffer VulkanEngine::CreateBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+retro::GPUMeshBuffer VulkanEngine::UploadMesh(std::span<uint32_t> indices, std::span<retro::Vertex> vertices)
 {
-    // allocate buffer
-    VkBufferCreateInfo bufferInfo = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-    bufferInfo.pNext = nullptr;
-    bufferInfo.size = allocSize;
-
-    bufferInfo.usage = usage;
-
-    VmaAllocationCreateInfo vmaallocInfo = {};
-    vmaallocInfo.usage = memoryUsage;
-    vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    AllocatedBuffer newBuffer;
-
-    // allocate the buffer
-    VK_CHECK(vmaCreateBuffer(allocator, &bufferInfo, &vmaallocInfo, &newBuffer.buffer, &newBuffer.allocation,
-        &newBuffer.info));
-
-    return newBuffer;
-}
-
-void VulkanEngine::DestroyBuffer(const AllocatedBuffer& buffer)
-{
-	vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
-}
-
-GPUMeshBuffers VulkanEngine::UploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices)
-{
-    const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
+    const size_t vertexBufferSize = vertices.size() * sizeof(retro::Vertex);
     const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
-    GPUMeshBuffers newSurface;
+    retro::GPUMeshBuffer newSurface;
 
     //create vertex buffer
-    newSurface.vertexBuffer = CreateBuffer(vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+    newSurface.vertexBuffer = retro::CreateBuffer(allocator,vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY);
 
     //find the adress of the vertex buffer
@@ -500,10 +494,10 @@ GPUMeshBuffers VulkanEngine::UploadMesh(std::span<uint32_t> indices, std::span<V
     newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(device, &deviceAdressInfo);
 
     //create index buffer
-    newSurface.indexBuffer = CreateBuffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+    newSurface.indexBuffer = retro::CreateBuffer(allocator, indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VMA_MEMORY_USAGE_GPU_ONLY);
 
-    AllocatedBuffer staging = CreateBuffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+    retro::Buffer staging = retro::CreateBuffer(allocator, vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
 
     void* data = staging.allocation->GetMappedData();
 
@@ -512,7 +506,7 @@ GPUMeshBuffers VulkanEngine::UploadMesh(std::span<uint32_t> indices, std::span<V
     // copy index buffer
     memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
 
-    ImmediateSubmitQueued([&](VkCommandBuffer cmd) {
+    ImmediateSubmit([&](VkCommandBuffer cmd) {
         VkBufferCopy vertexCopy{ 0 };
         vertexCopy.dstOffset = 0;
         vertexCopy.srcOffset = 0;
@@ -528,7 +522,7 @@ GPUMeshBuffers VulkanEngine::UploadMesh(std::span<uint32_t> indices, std::span<V
         vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
         });
 
-    DestroyBuffer(staging);
+    retro::DestroyBuffer(allocator, staging);
 
     return newSurface;
 }
