@@ -1,13 +1,17 @@
 #pragma once
+#include <fstream>
 #include <filesystem>
-#include "resources/vk_mesh.h"
 
 #define SIMDJSON_NO_INLINE
 #undef simdjson_inline
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/parser.hpp>
 #include <fastgltf/tools.hpp>
+#include <shaderc/shaderc.hpp>
+#include <fmt/core.h>
 
+#include "gfx/vk_debug.h"
+#include "resources/vk_mesh.h"
 
 namespace fs = std::filesystem;
 namespace FileManager 
@@ -23,9 +27,13 @@ namespace FileManager
 		//inline fs::path CalculateShaderPath(const std::string& shaderName) { return ""; };
 		//inline fs::path CalculateAssetPath(const std::string& assetName) { return ""; };
 	}
-	namespace modelLoader
+	namespace ShaderCompiler
 	{
-		
-		
+		void CompileFromDir(std::string dir);
+		bool LoadShaderModule(std::string filePath, VkDevice device, VkShaderModule* outShaderModule);
+	};
+	namespace ModelLoader
+	{
+		std::vector<std::shared_ptr<retro::CPUMesh>> LoadMeshFromFile(fs::path filePath);
 	}
 }

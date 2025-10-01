@@ -1,9 +1,5 @@
 ﻿//> includes
 #include "vk_engine.h"
-
-#define VMA_IMPLEMENTATION
-#include "vk_mem_alloc.h"
-
 #include <VkBootstrap.h>
 
 #include "imgui.h"
@@ -37,6 +33,10 @@ void VulkanEngine::Init()
    SDL_SetWindowResizable(window, true);
 
     InitVulkan();
+
+    MeshManager::Init(this, 
+       64 * 1024 * 1024,   // 64MB vertex pool, 
+       64 * 1024 * 1024 );   // 64MB index  pool
 
 	swapchain.SetProperties(allocator, chosenGPU, device, surface, windowExtent);
 	swapchain.Build(VsyncEnabled);
@@ -423,18 +423,18 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     // Vulkan Y-flip (keep this if you’re not using a negative viewport height)
     proj[1][1] *= -1.0f;
 
-	glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 40.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(0.1f, 1.0f, 0.0f));
 
     // If your push constants hold MVP, name it that:
     pushConstants.worldMatrix = proj * view * rotation;
 
 	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
 
-    pushConstants.vertexBuffer = testMeshes[1]->meshBuffer.vertexBufferAddress;
+    pushConstants.vertexBuffer = testMesh.meshBuffer.vertexBufferAddress;
 
     vkCmdPushConstants(commandBuffer, graphicsPipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::GPUDrawPushConstants), &pushConstants);
-    vkCmdBindIndexBuffer(commandBuffer, testMeshes[1]->meshBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(commandBuffer, testMeshes[1]->submeshes[0].count, 1, testMeshes[1]->submeshes[0].startIndex, 0, 0);
+    vkCmdBindIndexBuffer(commandBuffer, testMesh.meshBuffer.indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(commandBuffer, testMesh.submeshes[0].count, 1, testMesh.submeshes[0].startIndex, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 	VK_CHECK(vkEndCommandBuffer(commandBuffer));
@@ -442,16 +442,10 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 
 void VulkanEngine::InitDefaultMesh()
 {
-    testMeshes = loadGltfMeshes(this, FileManager::path::GetAssetPath("basicmesh.glb")).value();
+	testMesh = MeshManager::LoadMeshGPU(FileManager::path::GetAssetPath("basicmesh.glb"),1);
 
-	mainDeletionQueue.addBuffer(testMeshes[0]->meshBuffer.indexBuffer.buffer, testMeshes[0]->meshBuffer.indexBuffer.allocation);
-    mainDeletionQueue.addBuffer(testMeshes[0]->meshBuffer.vertexBuffer.buffer, testMeshes[0]->meshBuffer.vertexBuffer.allocation);
-
-    mainDeletionQueue.addBuffer(testMeshes[1]->meshBuffer.indexBuffer.buffer, testMeshes[1]->meshBuffer.indexBuffer.allocation);
-    mainDeletionQueue.addBuffer(testMeshes[1]->meshBuffer.vertexBuffer.buffer, testMeshes[1]->meshBuffer.vertexBuffer.allocation);
-
-    mainDeletionQueue.addBuffer(testMeshes[2]->meshBuffer.indexBuffer.buffer, testMeshes[2]->meshBuffer.indexBuffer.allocation);
-    mainDeletionQueue.addBuffer(testMeshes[2]->meshBuffer.vertexBuffer.buffer, testMeshes[2]->meshBuffer.vertexBuffer.allocation);
+	mainDeletionQueue.addBuffer(testMesh.meshBuffer.indexBuffer.buffer, testMesh.meshBuffer.indexBuffer.allocation);
+    mainDeletionQueue.addBuffer(testMesh.meshBuffer.vertexBuffer.buffer, testMesh.meshBuffer.vertexBuffer.allocation);
 }
 
 void VulkanEngine::ImmediateSubmit(std::function<void(VkCommandBuffer _cmd)>&& function)
@@ -478,55 +472,6 @@ void VulkanEngine::ImmediateSubmit(std::function<void(VkCommandBuffer _cmd)>&& f
     VK_CHECK(vkWaitForFences(device, 1, &immFence, true, UINT64_MAX));
 }
 
-retro::GPUMeshBuffer VulkanEngine::UploadMesh(std::span<uint32_t> indices, std::span<retro::Vertex> vertices)
-{
-    const size_t vertexBufferSize = vertices.size() * sizeof(retro::Vertex);
-    const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
-
-    retro::GPUMeshBuffer newSurface;
-
-    //create vertex buffer
-    newSurface.vertexBuffer = retro::CreateBuffer(allocator,vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-
-    //find the adress of the vertex buffer
-    VkBufferDeviceAddressInfo deviceAdressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,.buffer = newSurface.vertexBuffer.buffer };
-    newSurface.vertexBufferAddress = vkGetBufferDeviceAddress(device, &deviceAdressInfo);
-
-    //create index buffer
-    newSurface.indexBuffer = retro::CreateBuffer(allocator, indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-
-    retro::Buffer staging = retro::CreateBuffer(allocator, vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
-
-    void* data = staging.allocation->GetMappedData();
-
-    // copy vertex buffer
-    memcpy(data, vertices.data(), vertexBufferSize);
-    // copy index buffer
-    memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
-
-    ImmediateSubmit([&](VkCommandBuffer cmd) {
-        VkBufferCopy vertexCopy{ 0 };
-        vertexCopy.dstOffset = 0;
-        vertexCopy.srcOffset = 0;
-        vertexCopy.size = vertexBufferSize;
-
-        vkCmdCopyBuffer(cmd, staging.buffer, newSurface.vertexBuffer.buffer, 1, &vertexCopy);
-
-        VkBufferCopy indexCopy{ 0 };
-        indexCopy.dstOffset = 0;
-        indexCopy.srcOffset = vertexBufferSize;
-        indexCopy.size = indexBufferSize;
-
-        vkCmdCopyBuffer(cmd, staging.buffer, newSurface.indexBuffer.buffer, 1, &indexCopy);
-        });
-
-    retro::DestroyBuffer(allocator, staging);
-
-    return newSurface;
-}
-
 void VulkanEngine::Cleanup()
 {
     if (isInitialized) 
@@ -534,6 +479,7 @@ void VulkanEngine::Cleanup()
         //make sure the gpu has stopped doing its things
         vkDeviceWaitIdle(device);
         
+		MeshManager::ClearBuffers();
 		mainDeletionQueue.flush();
         swapchain.Destroy();
 

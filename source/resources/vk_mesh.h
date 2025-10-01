@@ -46,5 +46,13 @@ namespace retro
     {
         std::vector<retro::Vertex> vertices;
         std::vector<uint32_t> indices;
+
+        ~CPUMesh()
+        {
+            vertices.clear();
+            indices.clear();
+            submeshes.clear();
+            name = "";
+		}
     };
 }

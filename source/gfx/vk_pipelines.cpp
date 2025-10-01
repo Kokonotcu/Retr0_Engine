@@ -41,7 +41,7 @@ void GraphicsPipeline::ClearPipeline()
 
 void GraphicsPipeline::CreateVertexShaderModule(const char* fileName)
 {
-	if (ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(fileName).string(), device, &vertexShader))
+	if (FileManager::ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(fileName).string(), device, &vertexShader))
 		fmt::print("Error when building the vertex shader \n");
 	
 	vertexShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -53,7 +53,7 @@ void GraphicsPipeline::CreateVertexShaderModule(const char* fileName)
 
 void GraphicsPipeline::CreateFragmentShaderModule(const char* filePath)
 {
-	if (!ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(filePath).string(), device, &fragmentShader))
+	if (!FileManager::ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(filePath).string(), device, &fragmentShader))
 		fmt::print("Error when building the fragment shader \n");
 	
 	fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

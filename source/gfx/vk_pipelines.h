@@ -3,7 +3,6 @@
 #include <gfx/vk_debug.h>
 
 #include <tools/FileManager.h>
-#include <tools/ShaderCompiler.h>
 
 class GraphicsPipeline
 {
@@ -34,7 +33,7 @@ public:
 	template<typename vertexBufferType>
 	void CreateVertexShaderModule(const char* fileName)
 	{
-		if (!ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(fileName).string(), device, &vertexShader))
+		if (!FileManager::ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(fileName).string(), device, &vertexShader))
 		{
 			fmt::print("Error when building the vertex shader \n");
 		}
@@ -53,7 +52,7 @@ public:
 	template<typename fragmentBufferType>
 	void CreateFragmentShaderModule(const char* filePath)
 	{
-		if (!ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(filePath).string(), device, &fragmentShader))
+		if (!FileManager::ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(filePath).string(), device, &fragmentShader))
 		{
 			fmt::print("Error when building the fragment shader \n");
 		}

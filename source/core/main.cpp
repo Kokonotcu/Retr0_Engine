@@ -4,7 +4,7 @@ int main(int argc, char* argv[])
 {
 
 #ifdef DEBUG
-	ShaderCompiler::CompileFromDir(FileManager::path::GetShadersDirectory().string());
+	FileManager::ShaderCompiler::CompileFromDir(FileManager::path::GetShadersDirectory().string());
 #endif // DEBUG
 
 	//ShaderCompiler::CompileFromDir(FilePathManager::GetShadersDirectory().string());

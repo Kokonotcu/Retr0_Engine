@@ -21,7 +21,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "tools/ShaderCompiler.h"
 #include "resources/DeletionQueue.h"
 #include "tools/FileManager.h"
 #include "gfx/vk_swapchain.h"
@@ -107,7 +106,7 @@ public:
 	int frameNumber{ 0 };
 
 	//Mesh Stuff
-	std::vector<std::shared_ptr<retro::GPUMeshHandle>> testMeshes; //abstract this out
+	retro::GPUMeshHandle testMesh; //abstract this out
 private:
 	bool engineDebug = true;
 
