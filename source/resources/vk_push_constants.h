@@ -8,9 +8,13 @@
 namespace retro 
 {
     // push constants for our mesh object draws
-    struct GPUDrawPushConstants
+    struct GPUPushConstant
     {
         glm::mat4 worldMatrix;
         VkDeviceAddress vertexBuffer;
     };
+    struct CPUPushConstant
+    {
+        glm::mat4 worldMatrix;
+	};
 }

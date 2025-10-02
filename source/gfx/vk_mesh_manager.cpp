@@ -31,10 +31,6 @@ namespace MeshManager
         // very dumb bump allocators (start at 0, move forward):
         VkDeviceSize vertexHead = 0; 
         VkDeviceSize indexHead = 0;
-
-        // helper to copy CPU→staging→bigBuffer
-        void Upload(VkBuffer dst, VkDeviceSize dstOffset,
-            const void* src, size_t sizeBytes);
     }
 
     void Init(VulkanEngine* _engine, size_t maxVertexBytes, size_t maxIndexBytes)

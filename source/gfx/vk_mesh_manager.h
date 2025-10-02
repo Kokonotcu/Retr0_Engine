@@ -9,13 +9,11 @@
 
 //forward declaration
 class VulkanEngine;
-std::optional<std::vector<std::shared_ptr<retro::GPUMeshHandle>>> loadGltfMeshes(VulkanEngine* engine, std::filesystem::path filePath);
 
 namespace MeshManager 
 {
     // create the big buffers once
-    void Init(VulkanEngine* engine,
-        size_t maxVertexBytes, size_t maxIndexBytes);
+    void Init(VulkanEngine* engine, size_t maxVertexBytes, size_t maxIndexBytes);
 	void ClearBuffers();
 
     VkBuffer GetGlobalVertexBuffer();//

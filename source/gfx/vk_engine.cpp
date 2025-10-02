@@ -1,10 +1,9 @@
-﻿//> includes
-#include "vk_engine.h"
+﻿#include "vk_engine.h"
 #include <VkBootstrap.h>
 
-#include "imgui.h"
-#include "imgui_impl_sdl3.h"
-#include "imgui_impl_vulkan.h"
+//#include "imgui.h"
+//#include "imgui_impl_sdl3.h"
+//#include "imgui_impl_vulkan.h"
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
@@ -344,7 +343,7 @@ void VulkanEngine::InitGlobalPipelines()
 	graphicsPipeline.SetDevice(device);
 
     // -------------------------------------------------------------------------Vertex and Fragment Shader Stage-------------------------------------------------------------------------//
-    graphicsPipeline.CreateVertexShaderModule<retro::GPUDrawPushConstants>("pushed_triangle.vert.spv");
+    graphicsPipeline.CreateVertexShaderModule<retro::GPUPushConstant>("pushed_triangle.vert.spv");
     graphicsPipeline.CreateFragmentShaderModule("hardcoded_triangle_red.frag.spv");
     // -------------------------------------------------------------------------Vertex and Fragment Shader Stage-------------------------------------------------------------------------//
 
@@ -407,40 +406,27 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline.GetPipeline());
 
-    retro::GPUDrawPushConstants pushConstants;
-
     // View: camera at (0,0,5) looking at origin
     glm::mat4 view = glm::lookAt(
         glm::vec3(0.0f, 0.0f,3.f),
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f)
     );
-
     // Projection: correct near/far order
     float aspect = float(swapchain.GetExtent().width) / float(swapchain.GetExtent().height);
     glm::mat4 proj = glm::perspective(glm::radians(70.0f), aspect, 0.1f, 10000.0f);
-
     // Vulkan Y-flip (keep this if you’re not using a negative viewport height)
     proj[1][1] *= -1.0f;
 
-	glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(0.1f, 1.0f, 0.0f));
-    // If your push constants hold MVP, name it that:
-    pushConstants.worldMatrix = proj * view * rotation;
-
 	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
 
-    pushConstants.vertexBuffer = testMesh.vertexBufferAddress;
-    vkCmdPushConstants(commandBuffer, graphicsPipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::GPUDrawPushConstants), &pushConstants);
-    vkCmdBindIndexBuffer(commandBuffer, MeshManager::GetGlobalIndexBuffer(), testMesh.indexOffset, VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(commandBuffer, testMesh.submeshes[0].count, 1, testMesh.submeshes[0].startIndex, 0, 0);
+	glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(0.1f, 1.0f, 0.0f));
+    testMesh.Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(),nullptr, proj * view * rotation);
 
     rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(1.0f, 0.2f, 0.0f));
-    pushConstants.worldMatrix = proj * view * rotation;
+    testMesh2.Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), nullptr, proj * view * rotation);
 
-    pushConstants.vertexBuffer = testMesh2.vertexBufferAddress;
-    vkCmdPushConstants(commandBuffer, graphicsPipeline.GetPipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::GPUDrawPushConstants), &pushConstants);
-    vkCmdBindIndexBuffer(commandBuffer, MeshManager::GetGlobalIndexBuffer(), testMesh2.indexOffset, VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(commandBuffer, testMesh2.submeshes[0].count, 1, testMesh2.submeshes[0].startIndex, 0, 0);
+	fmt::print("Frame Time: {} FPS\n", Time::FPS());
 
     vkCmdEndRenderPass(commandBuffer);
 	VK_CHECK(vkEndCommandBuffer(commandBuffer));

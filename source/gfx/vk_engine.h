@@ -101,7 +101,7 @@ public:
 	bool isInitialized{ false };
 	bool framebufferResized = false;
 	bool stopRendering{ false };
-	bool VsyncEnabled{ true };
+	bool VsyncEnabled{ false };
 	int frameNumber{ 0 };
 
 	//Mesh Stuff

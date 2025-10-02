@@ -4,10 +4,9 @@
 #include <span>
 
 #include "resources/vk_buffer.h"
+#include "resources/vk_push_constants.h"
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
-
-
 
 namespace retro 
 {
@@ -26,7 +25,12 @@ namespace retro
         uint32_t count;
     };
 
-    struct Mesh 
+    struct Drawable
+    {
+        virtual void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, glm::mat4x4 worldMatrix) = 0;
+    };
+
+	struct Mesh : public Drawable
     {
         std::string name;
         std::vector<Submesh> submeshes;
@@ -40,6 +44,19 @@ namespace retro
         uint32_t          indexCount = 0;
 
         VkDeviceAddress vertexBufferAddress;
+		retro::GPUPushConstant gpuPushConstant;
+
+        void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, glm::mat4x4 worldMatrix) override
+        {
+			gpuPushConstant.worldMatrix = worldMatrix;
+			gpuPushConstant.vertexBuffer = vertexBufferAddress;
+            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::GPUPushConstant), &gpuPushConstant);
+            vkCmdBindIndexBuffer(cmd, indexBuffer, indexOffset, VK_INDEX_TYPE_UINT32);
+            
+            for (const auto& submesh : submeshes) {
+                vkCmdDrawIndexed(cmd, submesh.count, 1, submesh.startIndex, 0, 0);
+			}
+		}
     };
 
     struct CPUMesh : public Mesh 
@@ -54,5 +71,10 @@ namespace retro
             submeshes.clear();
             name = "";
 		}
+
+        void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, glm::mat4x4 worldMatrix) override 
+        {
+
+        }
     };
 }

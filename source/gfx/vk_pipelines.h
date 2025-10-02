@@ -44,9 +44,9 @@ public:
 		vertexShaderStageInfo.pName = "main";
 
 		pushConstants.push_back(VkPushConstantRange{});
-		pushConstants[0].offset = 0;
-		pushConstants[0].size = sizeof(vertexBufferType);
-		pushConstants[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		pushConstants.back().offset = 0;
+		pushConstants.back().size = sizeof(vertexBufferType);
+		pushConstants.back().stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	}
 	void CreateVertexShaderModule(const char* fileName);
 	template<typename fragmentBufferType>
@@ -62,21 +62,12 @@ public:
 		fragmentShaderStageInfo.module = fragmentShader;
 		fragmentShaderStageInfo.pName = "main";
 
-		if (pushConstants.size() > 0)
-		{
-			pushConstants.push_back(VkPushConstantRange{});
-			pushConstants[1].offset = pushConstants[0].size;
-			pushConstants[1].size = sizeof(fragmentBufferType);
-			pushConstants[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		}
-		else
-		{
-			pushConstants.push_back(VkPushConstantRange{});
-			pushConstants[0].offset = 0;
-			pushConstants[0].size = sizeof(fragmentBufferType);
-			pushConstants[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		}
 		
+		uint32_t siz = pushConstants.back().size;
+		pushConstants.push_back(VkPushConstantRange{});
+		pushConstants.back().offset = siz;
+		pushConstants.back().size = sizeof(fragmentBufferType);
+		pushConstants.back().stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	}
 	void CreateFragmentShaderModule(const char* filePath);
 
