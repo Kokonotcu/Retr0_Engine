@@ -95,7 +95,7 @@ void VulkanEngine::InitVulkan()
     vkb::InstanceBuilder builder;
 
     //make the vulkan instance, with basic debug features 
-    auto inst_ret = builder.set_app_name("Retr0 Engine") //Take a look at this later, might need to change for older devices
+    auto inst_ret = builder.set_app_name("Retr0 Engine")
         .request_validation_layers(enableValidationLayers)
         .use_default_debug_messenger()
         .desire_api_version(1, 3, 0)

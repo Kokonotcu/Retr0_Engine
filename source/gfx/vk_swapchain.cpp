@@ -7,7 +7,7 @@ void Swapchain::CreateSwapchain(uint32_t width, uint32_t height, bool Vsync)
 
     vkbSwapchain = swapchainBuilder
         //.use_default_format_selection()
-        .set_desired_format(VkSurfaceFormatKHR{ .format = VK_FORMAT_R16G16B16A16_SFLOAT, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
+        .set_desired_format(VkSurfaceFormatKHR{ .format = VK_FORMAT_B8G8R8A8_SRGB, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
         //use vsync present mode
         .set_desired_present_mode(Vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR)
         .set_desired_extent(width, height)
@@ -124,7 +124,6 @@ void Swapchain::Build(bool vsync)
     VkImageUsageFlags drawImageUsages{};
     drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
     drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
     VkImageCreateInfo rimg_info = {};

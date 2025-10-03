@@ -93,8 +93,8 @@ namespace FileManager
                                     newvtx.position = v;
                                     newvtx.normal = { 1, 0, 0 };
                                     newvtx.color = glm::vec4{ 1.f };
-                                    newvtx.uv_x = 0;
-                                    newvtx.uv_y = 0;
+                                    newvtx.uv.x = 0;
+                                    newvtx.uv.y = 0;
                                     meshes.back()->vertices[initial_vtx + index] = newvtx;
                                 });
                         }
@@ -109,33 +109,48 @@ namespace FileManager
                                 });
                         }
 
-                        // load UVs
-                        auto uv = p.findAttribute("TEXCOORD_0");
-                        if (uv != p.attributes.end()) {
+						// load UVs (float2 -> two 16-bit halfs)
+						auto uv = p.findAttribute("TEXCOORD_0");
+						if (uv != p.attributes.end()) 
+						{
+							fastgltf::iterateAccessorWithIndex<glm::vec2>(gltf, gltf.accessors[(*uv).second],
+								[&](glm::vec2 v, size_t index) 
+								{
+									auto& vert = meshes.back()->vertices[initial_vtx + index];
+									vert.uv.x = glm::packHalf1x16(v.x); // uint16 half bits
+									vert.uv.y = glm::packHalf1x16(v.y); // uint16 half bits
+								});
+						}
 
-                            fastgltf::iterateAccessorWithIndex<glm::vec2>(gltf, gltf.accessors[(*uv).second],
-                                [&](glm::vec2 v, size_t index) {
-                                    meshes.back()->vertices[initial_vtx + index].uv_x = v.x;
-                                    meshes.back()->vertices[initial_vtx + index].uv_y = v.y;
-                                });
-                        }
-
-                        // load vertex colors
-                        auto colors = p.findAttribute("COLOR_0");
-                        if (colors != p.attributes.end()) {
-
-                            fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, gltf.accessors[(*colors).second],
-                                [&](glm::vec4 v, size_t index) {
-                                    meshes.back()->vertices[initial_vtx + index].color = v;
-                                });
-                        }
+						// load vertex colors (float4 0..1 -> RGBA8 UNORM)
+						auto colors = p.findAttribute("COLOR_0");
+						if (colors != p.attributes.end()) 
+						{
+							fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, gltf.accessors[(*colors).second],
+								[&](glm::vec4 v, size_t index) 
+								{
+									auto& vert = meshes.back()->vertices[initial_vtx + index];
+									// Convert float[0..1] -> u8[0..255] (rounding & clamping)
+									vert.color = glm::u8vec4(
+										glm::clamp(int(v.r * 255.0f + 0.5f), 0, 255),
+										glm::clamp(int(v.g * 255.0f + 0.5f), 0, 255),
+										glm::clamp(int(v.b * 255.0f + 0.5f), 0, 255),
+										glm::clamp(int(v.a * 255.0f + 0.5f), 0, 255)
+									);
+								});
+						}
                     }
 
                     // display the vertex normals
                     constexpr bool OverrideColors = true;
                     if (OverrideColors) {
                         for (retro::Vertex& vtx : meshes.back()->vertices) {
-                            vtx.color = glm::vec4(vtx.normal, 1.f);
+                            vtx.color = glm::u8vec4(
+								glm::clamp(int(vtx.normal.r * 255.0f + 0.5f), 0, 255),
+								glm::clamp(int(vtx.normal.g * 255.0f + 0.5f), 0, 255),
+								glm::clamp(int(vtx.normal.b * 255.0f + 0.5f), 0, 255),
+								glm::clamp(255, 0, 255)
+							);
                         }
                     }
                 }

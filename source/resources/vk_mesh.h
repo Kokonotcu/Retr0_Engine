@@ -7,17 +7,18 @@
 #include "resources/vk_push_constants.h"
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
+#include <glm/gtc/packing.hpp>
 
 namespace retro 
 {
     struct Vertex
     {
         glm::vec3 position;
-        float uv_x;
+        glm::u16vec2 uv;
         glm::vec3 normal;
-        float uv_y;
-        glm::vec4 color;
+        glm::u8vec4 color;
     };
+    static_assert(sizeof(Vertex) == 32);
 
     struct Submesh 
     {
