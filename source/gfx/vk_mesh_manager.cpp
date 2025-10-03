@@ -31,6 +31,10 @@ namespace MeshManager
         // very dumb bump allocators (start at 0, move forward):
         VkDeviceSize vertexHead = 0; 
         VkDeviceSize indexHead = 0;
+
+        inline VkDeviceSize Align(VkDeviceSize v, VkDeviceSize a) {
+            return (v + a - 1) & ~(a - 1);
+        }
     }
 
     void Init(VulkanEngine* _engine, size_t maxVertexBytes, size_t maxIndexBytes)
@@ -116,12 +120,17 @@ namespace MeshManager
         const size_t vertexBytes = m->vertices.size() * sizeof(retro::Vertex);
         const size_t indexBytes = m->indices.size() * sizeof(uint32_t);
 
+        // Align heads before reserving space in the global buffers
+        const VkDeviceSize alignedVertexHead = Align(vertexHead, 16); // 16B for vertex data
+        const VkDeviceSize alignedIndexHead = Align(indexHead, 4);  // 4B  for uint32 indices
+
         // 2) Capacity check against global buffers
-        const VkDeviceSize vCap = globalVertexBuffer.info.size; // VMA alloc info size
+        const VkDeviceSize vCap = globalVertexBuffer.info.size;
         const VkDeviceSize iCap = globalIndexBuffer.info.size;
-        if (vertexHead + vertexBytes > vCap || indexHead + indexBytes > iCap) {
+        if (alignedVertexHead + vertexBytes > vCap || alignedIndexHead + indexBytes > iCap) {
             fmt::print("MeshManager: out of space (need V:{} I:{}, have V:{} I:{})\n",
-                vertexBytes, indexBytes, (size_t)(vCap - vertexHead), (size_t)(iCap - indexHead));
+                vertexBytes, indexBytes,
+                (size_t)(vCap - alignedVertexHead), (size_t)(iCap - alignedIndexHead));
             return handle; // empty
         }
 
@@ -142,14 +151,14 @@ namespace MeshManager
             // vertices → global vertex buffer
             VkBufferCopy vCopy{};
             vCopy.srcOffset = 0;
-            vCopy.dstOffset = vertexHead;
+            vCopy.dstOffset = alignedVertexHead;
             vCopy.size = vertexBytes;
             vkCmdCopyBuffer(cmd, staging.buffer, globalVertexBuffer.buffer, 1, &vCopy);
 
             // indices → global index buffer
             VkBufferCopy iCopy{};
             iCopy.srcOffset = vertexBytes;
-            iCopy.dstOffset = indexHead;
+            iCopy.dstOffset = alignedIndexHead;
             iCopy.size = indexBytes;
             vkCmdCopyBuffer(cmd, staging.buffer, globalIndexBuffer.buffer, 1, &iCopy);
             });
@@ -157,8 +166,8 @@ namespace MeshManager
         // 6) Build the handle (offsets/counts)
         handle.name = m->name;
         handle.submeshes = m->submeshes;       // NOTE: these startIndex values are local to this mesh
-        handle.vertexOffset = vertexHead;
-        handle.indexOffset = indexHead;
+        handle.vertexOffset = alignedVertexHead;
+        handle.indexOffset = alignedIndexHead;
         handle.indexCount = static_cast<uint32_t>(m->indices.size());
 
         // BDA base address for shader fetch
@@ -168,8 +177,8 @@ namespace MeshManager
         }
 
         // 7) Advance heads
-        vertexHead += vertexBytes;
-        indexHead += indexBytes;
+        vertexHead = alignedVertexHead  + vertexBytes;
+        indexHead = alignedIndexHead + indexBytes;
 
         // 8) Cleanup staging and CPU vectors
         retro::DestroyBuffer(engine->GetAllocator(), staging);
