@@ -22,6 +22,6 @@ namespace Time
 	std::shared_ptr<TimeTracker> RequestTracker(float period);
 	void CalculateDeltaTime();
 	const float GetDeltatime();
-	const float GetTime();
+	const double GetTime();
 	float FPS();
 };

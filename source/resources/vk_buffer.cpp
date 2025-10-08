@@ -10,7 +10,9 @@ retro::Buffer retro::CreateBuffer(VmaAllocator allocator, size_t allocSize, VkBu
 
     VmaAllocationCreateInfo vmaallocInfo = {};
     vmaallocInfo.usage = memoryUsage;
-    vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    if (!(memoryUsage == VmaMemoryUsage::VMA_MEMORY_USAGE_GPU_ONLY))
+        vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    
     retro::Buffer newBuffer;
 
     // allocate the buffer

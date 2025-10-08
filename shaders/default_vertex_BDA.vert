@@ -11,8 +11,8 @@ struct Vertex {
     uint  color; // four UNORM8
 };
 
-vec2 decodeUV(uint packed)   { return unpackHalf2x16(packed); }
-vec4 decodeColor(uint packed){ return unpackUnorm4x8(packed); }
+vec2 decodeUV(uint pack)   { return unpackHalf2x16(pack); }
+vec4 decodeColor(uint pack){ return unpackUnorm4x8(pack); }
 
 layout(buffer_reference, std430) readonly buffer VertexBuffer{ 
 	Vertex vertices[];
@@ -30,7 +30,7 @@ void main()
 	//load vertex data from device adress
 	Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];
 	
-	vec3 norm  = normalize(v.normal);
+	vec3 norm  = v.normal;
 	vec2 uv    = decodeUV(v.uv);
 	vec4 color = decodeColor(v.color);
 	

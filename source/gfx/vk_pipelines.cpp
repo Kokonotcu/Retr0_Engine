@@ -74,13 +74,47 @@ void GraphicsPipeline::CreateDynamicState()
 	viewportStateInfo.scissorCount = 1;
 }
 
-void GraphicsPipeline::CreateVertexInput()
+void GraphicsPipeline::CreateBDAVertexInput()
 {
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertexInputInfo.vertexBindingDescriptionCount = 0;
 	vertexInputInfo.pVertexBindingDescriptions = nullptr; // Optional helps define spacing between data and whether the data is per-vertex or per-instance
 	vertexInputInfo.vertexAttributeDescriptionCount = 0;
 	vertexInputInfo.pVertexAttributeDescriptions = nullptr;// Optional helps define how to extract a vertex attribute from a chunk of vertex data originating from a binding description
+}
+
+void GraphicsPipeline::CreateClassicVertexInput()
+{
+	bindingDescription.binding = 0;
+	bindingDescription.stride = sizeof(retro::Vertex);
+	bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+	attributeDescriptions[0].binding = 0;
+	attributeDescriptions[0].location = 0;
+	attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+	attributeDescriptions[0].offset = offsetof(retro::Vertex, position);
+
+	attributeDescriptions[1].binding = 0;
+	attributeDescriptions[1].location = 1;
+	attributeDescriptions[1].format = VK_FORMAT_R32_UINT;
+	attributeDescriptions[1].offset = offsetof(retro::Vertex, uv);
+
+	attributeDescriptions[2].binding = 0;
+	attributeDescriptions[2].location = 2;
+	attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+	attributeDescriptions[2].offset = offsetof(retro::Vertex, normal);
+
+	attributeDescriptions[3].binding = 0;
+	attributeDescriptions[3].location = 3;
+	attributeDescriptions[3].format = VK_FORMAT_R32_UINT;
+	attributeDescriptions[3].offset = offsetof(retro::Vertex, color);
+
+
+	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 }
 
 void GraphicsPipeline::CreateInputAssembly()

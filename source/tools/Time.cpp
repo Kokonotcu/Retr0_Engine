@@ -7,7 +7,7 @@ namespace Time
 		std::vector<std::shared_ptr<TimeTracker>> trackers;
 		float deltaTime = 0.0f;
 		auto last = std::chrono::steady_clock::now();
-		float average[100] = { 0.0f }; int i = 0;
+		float average[60] = { 0.0f }; int i = 0;
 	}
 
 	std::shared_ptr<TimeTracker> RequestTracker(float period)
@@ -28,24 +28,24 @@ namespace Time
 			t->CalculateTime();
 
 		average[i] = (1.0f / deltaTime);
-		i = (i + 1) % 100;
+		i = (i + 1) % 60;
 	}
 	const float GetDeltatime()
 	{
 		return deltaTime;
 	}
-	const float GetTime()
+	const double GetTime()
 	{
-		return std::chrono::duration<float>(std::chrono::steady_clock::now().time_since_epoch()).count();
+		return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	}
 	float FPS()
 	{
 		float sum = 0.0f;
-		for (int x = 0; x < 100; x++)
+		for (int x = 0; x < 60; x++)
 		{
 			sum += average[x];
 		}
-		return sum / 100.0f;
+		return sum / 60.0f;
 	}
 
 

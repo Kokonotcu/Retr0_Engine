@@ -104,6 +104,79 @@ namespace MeshManager
         return globalIndexBuffer.buffer; 
     }
 
+    std::shared_ptr<retro::CPUMesh> LoadMeshCPU(std::filesystem::path filePath, int modelIndex)
+    {
+        // 1) Load CPU-side mesh
+        auto meshes = FileManager::ModelLoader::LoadMeshFromFile(filePath);
+
+        if (meshes.size() <= 0 || modelIndex < 0 || modelIndex >= (int)meshes.size()) {
+            fmt::print("MeshManager: invalid modelIndex or load failed: {}\n", filePath.string());
+            return nullptr; // empty
+        }
+
+        fmt::print("MeshManager: loaded mesh {} index amount: {} vertex amount: {} \n", modelIndex, meshes.at(modelIndex)->indices.size(), meshes.at(modelIndex)->vertices.size());
+        
+        const auto& m = meshes.at(modelIndex);
+        const size_t vertexBytes = m->vertices.size() * sizeof(retro::Vertex);
+        const size_t indexBytes = m->indices.size() * sizeof(uint32_t);
+
+        // Align heads before reserving space in the global buffers
+        const VkDeviceSize alignedVertexHead = Align(vertexHead, 16); // 16B for vertex data
+        const VkDeviceSize alignedIndexHead = Align(indexHead, 4);  // 4B  for uint32 indices
+
+        // 2) Capacity check against global buffers
+        const VkDeviceSize vCap = globalVertexBuffer.info.size;
+        const VkDeviceSize iCap = globalIndexBuffer.info.size;
+        if (alignedVertexHead + vertexBytes > vCap || alignedIndexHead + indexBytes > iCap) {
+            fmt::print("MeshManager: out of space (need V:{} I:{}, have V:{} I:{})\n",
+                vertexBytes, indexBytes,
+                (size_t)(vCap - alignedVertexHead), (size_t)(iCap - alignedIndexHead));
+            return nullptr; // empty
+        }
+
+        // 3) Staging buffer (one-shot, merged for V+I)
+        retro::Buffer staging = retro::CreateBuffer(
+            engine->GetAllocator(),
+            vertexBytes + indexBytes,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_MEMORY_USAGE_CPU_ONLY
+        );
+
+        // 4) Fill staging directly
+        uint8_t* mapped = static_cast<uint8_t*>(staging.allocation->GetMappedData());
+        memcpy(mapped + 0, m->vertices.data(), vertexBytes);
+        memcpy(mapped + vertexBytes, m->indices.data(), indexBytes);
+
+        engine->ImmediateSubmit([&](VkCommandBuffer cmd) {
+            // vertices → global vertex buffer
+            VkBufferCopy vCopy{};
+            vCopy.srcOffset = 0;
+            vCopy.dstOffset = alignedVertexHead;
+            vCopy.size = vertexBytes;
+            vkCmdCopyBuffer(cmd, staging.buffer, globalVertexBuffer.buffer, 1, &vCopy);
+
+            // indices → global index buffer
+            VkBufferCopy iCopy{};
+            iCopy.srcOffset = vertexBytes;
+            iCopy.dstOffset = alignedIndexHead;
+            iCopy.size = indexBytes;
+            vkCmdCopyBuffer(cmd, staging.buffer, globalIndexBuffer.buffer, 1, &iCopy);
+            });
+
+        meshes.at(modelIndex)->vertexOffset = alignedVertexHead;
+        meshes.at(modelIndex)->indexOffset = alignedIndexHead;
+        meshes.at(modelIndex)->indexCount = static_cast<uint32_t>(m->indices.size());
+
+        // 5) Advance heads
+        vertexHead = alignedVertexHead + vertexBytes;
+        indexHead = alignedIndexHead + indexBytes;
+
+        // 6) Cleanup staging and CPU vectors
+        retro::DestroyBuffer(engine->GetAllocator(), staging);
+
+        return meshes.at(modelIndex);
+    }
+
     retro::GPUMeshHandle LoadMeshGPU(std::filesystem::path filePath, int modelIndex)
     {
         retro::GPUMeshHandle handle{};
@@ -115,6 +188,8 @@ namespace MeshManager
             fmt::print("MeshManager: invalid modelIndex or load failed: {}\n", filePath.string());
             return handle; // empty
         }
+
+		fmt::print("MeshManager: loaded mesh {} index amount: {} vertex amount: {} \n", modelIndex, meshes.at(modelIndex)->indices.size(), meshes.at(modelIndex)->vertices.size());
         
         const auto& m = meshes.at(modelIndex);
         const size_t vertexBytes = m->vertices.size() * sizeof(retro::Vertex);

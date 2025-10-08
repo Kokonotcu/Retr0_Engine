@@ -20,7 +20,7 @@ namespace MeshManager
     VkBuffer GetGlobalIndexBuffer(); // 
     
 	// Load a mesh from a file, return create a CPU mesh or a GPU mesh handle
-    std::shared_ptr<retro::CPUMesh> LoadMeshCPU(std::filesystem::path filePath);
+    std::shared_ptr<retro::CPUMesh> LoadMeshCPU(std::filesystem::path filePath, int modelIndex);
     retro::GPUMeshHandle LoadMeshGPU(std::filesystem::path filePath, int modelIndex);
 
 	// take a CPUMesh and transfer it to the GPU, returning a handle

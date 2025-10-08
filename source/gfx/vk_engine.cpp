@@ -54,6 +54,7 @@ void VulkanEngine::Init()
     isInitialized = true;
 
 	frameTimer = Time::RequestTracker(1.0f);
+	printCheckerTimer = Time::RequestTracker(1.0f);
 }
 
 bool VulkanEngine::CheckValidationLayerSupport()
@@ -136,7 +137,7 @@ void VulkanEngine::InitVulkan()
         //vulkan 1.2 features
         VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES }; //Take a look at this later, might need to change for older devices
         features12.bufferDeviceAddress = true; // make this false if the device doesnt support it
-        features12.descriptorIndexing = true; // make this false if the device doesnt support it
+        features12.descriptorIndexing = false; // make this false if the device doesnt support it
 
 		bufferDeviceAddress = features12.bufferDeviceAddress;
 
@@ -157,7 +158,7 @@ void VulkanEngine::InitVulkan()
             .set_surface(surface)
             .select();
     }
-
+	bufferDeviceAddress = false; // TEMP OVERRIDE WHILE WE DONT HAVE THE PROPER FALLBACK PATH
     
 #ifdef DEBUG
     if (!phy_ret)
@@ -341,10 +342,10 @@ void VulkanEngine::InitPipelines()
 void VulkanEngine::InitGlobalPipelines()
 {
 	graphicsPipeline.SetDevice(device);
-
     // -------------------------------------------------------------------------Vertex and Fragment Shader Stage-------------------------------------------------------------------------//
-    graphicsPipeline.CreateVertexShaderModule<retro::GPUPushConstant>("pushed_triangle.vert.spv");
-    graphicsPipeline.CreateFragmentShaderModule("hardcoded_triangle_red.frag.spv");
+    //graphicsPipeline.CreateVertexShaderModule<retro::GPUPushConstant>("default_vertex_BDA.vert.spv");
+    graphicsPipeline.CreateVertexShaderModule<retro::CPUPushConstant>("default_vertex.vert.spv");
+    graphicsPipeline.CreateFragmentShaderModule("default_fragment.frag.spv");
     // -------------------------------------------------------------------------Vertex and Fragment Shader Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Dynamic State configuration-------------------------------------------------------------------------//
@@ -352,7 +353,8 @@ void VulkanEngine::InitGlobalPipelines()
     // -------------------------------------------------------------------------Dynamic State configuration-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Vertex Input Stage-------------------------------------------------------------------------//
-	graphicsPipeline.CreateVertexInput();
+	//graphicsPipeline.CreateBDAVertexInput();
+	graphicsPipeline.CreateClassicVertexInput();
     // -------------------------------------------------------------------------Vertex Input Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Input Assembly Stage-------------------------------------------------------------------------//
@@ -368,7 +370,7 @@ void VulkanEngine::InitGlobalPipelines()
      // -------------------------------------------------------------------------Multisampling Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
-	///graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS);
+	//graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS);
     //graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_COMPARE_OP_LESS);
     graphicsPipeline.CreateBlending(69, VK_COMPARE_OP_LESS);
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
@@ -403,8 +405,8 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     renderPassInfo.pClearValues = clearValues;
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline.GetPipeline());
+	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
 
     // View: camera at (0,0,5) looking at origin
     glm::mat4 view = glm::lookAt(
@@ -418,24 +420,21 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     // Vulkan Y-flip (keep this if you’re not using a negative viewport height)
     proj[1][1] *= -1.0f;
 
-	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
-
 	glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(0.1f, 1.0f, 0.0f));
-    testMesh.Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(),nullptr, proj * view * rotation);
+    testMesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(),MeshManager::GetGlobalVertexBuffer(), proj * view * rotation);
 
     rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(1.0f, 0.2f, 0.0f));
-    testMesh2.Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), nullptr, proj * view * rotation);
-
-	fmt::print("Frame Time: {} FPS\n", Time::FPS());
+    testMesh2->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), proj * view * rotation);
 
     vkCmdEndRenderPass(commandBuffer);
+    
 	VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
 void VulkanEngine::InitDefaultMesh()
 {
-	testMesh = MeshManager::LoadMeshGPU(FileManager::path::GetAssetPath("basicmesh.glb"),1);
-    testMesh2 = MeshManager::LoadMeshGPU(FileManager::path::GetAssetPath("basicmesh.glb"), 2);
+	testMesh = MeshManager::LoadMeshCPU(FileManager::path::GetAssetPath("basicmesh.glb"),1);
+    testMesh2 = MeshManager::LoadMeshCPU(FileManager::path::GetAssetPath("basicmesh.glb"), 2);
 }
 
 void VulkanEngine::ImmediateSubmit(std::function<void(VkCommandBuffer _cmd)>&& function)
@@ -493,6 +492,7 @@ void VulkanEngine::Draw()
     uint32_t swapchainImageIndex;
     VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, get_current_frame().renderSemaphore, nullptr, &swapchainImageIndex);
 
+
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
     {
         int w, h;
@@ -543,7 +543,7 @@ void VulkanEngine::Draw()
     presentInfo.pImageIndices = &swapchainImageIndex;
     presentInfo.pResults = nullptr; // Optional
 
-    VkResult resultP = vkQueuePresentKHR(graphicsQueue, &presentInfo);
+    VkResult resultP = vkQueuePresentKHR(graphicsQueue, &presentInfo);    
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR  || framebufferResized)
     {
@@ -563,6 +563,11 @@ void VulkanEngine::Draw()
 
     //increase the number of frames drawn
     frameNumber = (frameNumber + 1) % FRAME_OVERLAP;
+
+    if (printCheckerTimer->Check())
+    {
+        fmt::print("Frame Time: {} FPS\n", Time::FPS());
+    }
 }
 
 void VulkanEngine::Run()

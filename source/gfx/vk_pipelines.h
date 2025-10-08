@@ -73,7 +73,8 @@ public:
 
 	void CreateDynamicState();
 
-	void CreateVertexInput();
+	void CreateBDAVertexInput();
+	void CreateClassicVertexInput();
 
 	void CreateInputAssembly();
 
@@ -128,6 +129,11 @@ private:
 	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 	//VkRenderingAttachmentInfo depthAttachment{};
 	//-------------------------------Blending Stage--------------------------------//
+
+	//-------------------------------Vertex Input--------------------------------//
+	VkVertexInputBindingDescription bindingDescription{};
+	std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
+	//-------------------------------Vertex Input--------------------------------//
 
 	//-------------------------------Pipeline Layout--------------------------------//
 	VkPipelineLayout pipelineLayout{};

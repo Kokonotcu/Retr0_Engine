@@ -105,8 +105,11 @@ public:
 	int frameNumber{ 0 };
 
 	//Mesh Stuff
-	retro::GPUMeshHandle testMesh;
-	retro::GPUMeshHandle testMesh2;
+	//retro::GPUMeshHandle testMesh;
+	//retro::GPUMeshHandle testMesh2;
+
+	std::shared_ptr<retro::CPUMesh> testMesh;
+	std::shared_ptr<retro::CPUMesh> testMesh2;
 private:
 	bool engineDebug = true;
 
@@ -116,5 +119,6 @@ private:
 	VulkanEngine* loadedEngine = nullptr;
 
 	std::shared_ptr<Time::TimeTracker> frameTimer;
+	std::shared_ptr<Time::TimeTracker> printCheckerTimer;
 };
 

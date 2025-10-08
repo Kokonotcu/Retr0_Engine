@@ -56,7 +56,8 @@ namespace FileManager
 
                 std::vector<std::shared_ptr<retro::CPUMesh>> meshes;
 
-                for (fastgltf::Mesh& gltfMesh : gltf.meshes) {
+                for (fastgltf::Mesh& gltfMesh : gltf.meshes) 
+				{
 
 					meshes.push_back(std::make_shared<retro::CPUMesh>());
 					meshes.back()->name = gltfMesh.name;
@@ -143,13 +144,16 @@ namespace FileManager
 
                     // display the vertex normals
                     constexpr bool OverrideColors = true;
-                    if (OverrideColors) {
-                        for (retro::Vertex& vtx : meshes.back()->vertices) {
-                            vtx.color = glm::u8vec4(
-								glm::clamp(int(vtx.normal.r * 255.0f + 0.5f), 0, 255),
-								glm::clamp(int(vtx.normal.g * 255.0f + 0.5f), 0, 255),
-								glm::clamp(int(vtx.normal.b * 255.0f + 0.5f), 0, 255),
-								glm::clamp(255, 0, 255)
+                    if (OverrideColors) 
+					{
+                        for (retro::Vertex& vtx : meshes.back()->vertices) 
+						{
+							glm::vec3 n01 = vtx.normal * 0.5f;
+							vtx.color = glm::u8vec4(
+								(uint8_t)glm::clamp(int(n01.r * 255.0f + 0.5f), 0, 255),
+								(uint8_t)glm::clamp(int(n01.g * 255.0f + 0.5f), 0, 255),
+								(uint8_t)glm::clamp(int(n01.b * 255.0f + 0.5f), 0, 255),
+								255
 							);
                         }
                     }
