@@ -5,9 +5,9 @@ namespace Time
 	namespace
 	{
 		std::vector<std::shared_ptr<TimeTracker>> trackers;
-		float deltaTime = 0.0f;
-		auto last = std::chrono::steady_clock::now();
-		float average[60] = { 0.0f }; int i = 0;
+		double deltaTime = 0.0;
+		auto last = std::chrono::high_resolution_clock::now(); //std::chrono::steady_clock::now(); 
+		double average[150] = { 0.0 }; int i = 0;
 	}
 
 	std::shared_ptr<TimeTracker> RequestTracker(float period)
@@ -19,37 +19,36 @@ namespace Time
 
 	void CalculateDeltaTime()
 	{
-		const auto old = last;
-		last = std::chrono::steady_clock::now();
-		const std::chrono::duration<float> t = last - old;
-		deltaTime = t.count();
+		auto old = last;
+		last = std::chrono::high_resolution_clock::now(); //std::chrono::steady_clock::now();
+		deltaTime = std::chrono::duration_cast<std::chrono::duration<double>> (last - old).count() ;
 
-		for (auto t : trackers)
+		for (auto &t : trackers)
 			t->CalculateTime();
 
-		average[i] = (1.0f / deltaTime);
-		i = (i + 1) % 60;
+		average[i] = (deltaTime);
+		i = (i + 1) % 150;
 	}
-	const float GetDeltatime()
+	double GetDeltatime()
 	{
 		return deltaTime;
 	}
-	const double GetTime()
+	double GetTime()
 	{
-		return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+		return std::chrono::duration_cast<std::chrono::duration<double>> (std::chrono::steady_clock::now().time_since_epoch()).count();
 	}
-	float FPS()
+	double FPS()
 	{
-		float sum = 0.0f;
-		for (int x = 0; x < 60; x++)
+		double sum = 0.0;
+		for (int x = 0; x < 150; x++)
 		{
 			sum += average[x];
 		}
-		return sum / 60.0f;
+		return 1.0 / (sum / 150.0);
 	}
 
 
-	TimeTracker::TimeTracker(float _limit)
+	TimeTracker::TimeTracker(double _limit)
 		:
 		period(_limit)
 	{
@@ -59,17 +58,17 @@ namespace Time
 	{
 		timePassed += deltaTime;
 	}
-	float TimeTracker::GetPeriod()
+	double TimeTracker::GetPeriod()
 	{
 		return period;
 	}
-	float TimeTracker::GetTimePassed()
+	double TimeTracker::GetTimePassed()
 	{
 		return timePassed;
 	}
 	bool TimeTracker::Check()
 	{
-		if (timePassed >= 2 * period)
+		if (timePassed >= period)
 		{
 			timePassed -= period;
 			return true;
@@ -80,7 +79,7 @@ namespace Time
 	{
 		if (timePassed >= period)
 		{
-			timePassed = 0.0f;
+			timePassed = 0.0;
 			return true;
 		}
 		return false;

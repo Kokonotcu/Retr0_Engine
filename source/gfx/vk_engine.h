@@ -55,7 +55,7 @@ public:
 
 	void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);   
 private:
-	FrameCommander& get_current_frame() { return frames[frameNumber % FRAME_OVERLAP]; };
+	//FrameCommander& get_current_frame() { return frames[frameNumber % FRAME_OVERLAP]; };
 
 	void InitVulkan();
 	bool CheckValidationLayerSupport();
@@ -102,7 +102,8 @@ public:
 	bool framebufferResized = false;
 	bool stopRendering{ false };
 	bool VsyncEnabled{ false };
-	int frameNumber{ 0 };
+	int selected = 0;
+	//int frameNumber{ 0 };
 
 	//Mesh Stuff
 	//retro::GPUMeshHandle testMesh;

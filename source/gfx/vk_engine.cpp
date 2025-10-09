@@ -29,7 +29,9 @@ void VulkanEngine::Init()
         window_flags
     );
    fmt::print("{}",SDL_GetError());
-   SDL_SetWindowResizable(window, true);
+   //SDL_SetWindowResizable(window, true);
+   SDL_SetWindowFullscreenMode(window,NULL);
+   SDL_SetWindowFullscreen(window, true);
 
     InitVulkan();
 
@@ -485,12 +487,20 @@ void VulkanEngine::Cleanup()
     }
 }
 
+
 void VulkanEngine::Draw()
 {
-    VK_CHECK(vkWaitForFences(device, 1, &get_current_frame().renderFence, true, UINT64_MAX));
+    selected = 0;
+    while (true)
+    {
+        if (vkGetFenceStatus(device, frames[selected].renderFence) == VK_SUCCESS)
+            break;
+        
+		selected = (selected + 1) % FRAME_OVERLAP;
+    }
 
     uint32_t swapchainImageIndex;
-    VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, get_current_frame().renderSemaphore, nullptr, &swapchainImageIndex);
+    VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, frames[selected].renderSemaphore, nullptr, &swapchainImageIndex);
 
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -508,9 +518,9 @@ void VulkanEngine::Draw()
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    VK_CHECK(vkResetFences(device, 1, &get_current_frame().renderFence));
+    VK_CHECK(vkResetFences(device, 1, &frames[selected].renderFence));
 
-    VkCommandBuffer cmd = get_current_frame().mainCommandBuffer;
+    VkCommandBuffer cmd = frames[selected].mainCommandBuffer;
     VK_CHECK(vkResetCommandBuffer(cmd, 0));
     
 	RecordCommandBuffer(cmd, swapchainImageIndex);
@@ -518,7 +528,7 @@ void VulkanEngine::Draw()
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = { get_current_frame().renderSemaphore };
+    VkSemaphore waitSemaphores[] = { frames[selected].renderSemaphore };
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
@@ -530,7 +540,7 @@ void VulkanEngine::Draw()
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    VK_CHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, get_current_frame().renderFence));
+    VK_CHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, frames[selected].renderFence));
 
     VkPresentInfoKHR presentInfo = {};
     presentInfo.pNext = nullptr;
@@ -562,11 +572,11 @@ void VulkanEngine::Draw()
     }
 
     //increase the number of frames drawn
-    frameNumber = (frameNumber + 1) % FRAME_OVERLAP;
+    //frameNumber = (frameNumber + 1) % FRAME_OVERLAP;
 
     if (printCheckerTimer->Check())
     {
-        fmt::print("Frame Time: {} FPS\n", Time::FPS());
+        fmt::print("Frame Time: {} ms\n", Time::GetDeltatime() * 1000.0);
     }
 }
 

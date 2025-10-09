@@ -8,20 +8,20 @@ namespace Time
 	struct TimeTracker
 	{
 		TimeTracker() = delete;
-		TimeTracker(float period);
+		TimeTracker(double period);
 		void CalculateTime();
-		float GetPeriod();
-		float GetTimePassed();
+		double GetPeriod();
+		double GetTimePassed();
 		bool Check();
 		bool CheckOnce();
 	private:
-		float timePassed = 0.0f;
-		float period = 0.0f;
+		double timePassed = 0.0f;
+		double period = 0.0f;
 	};
 
 	std::shared_ptr<TimeTracker> RequestTracker(float period);
 	void CalculateDeltaTime();
-	const float GetDeltatime();
-	const double GetTime();
-	float FPS();
+	double GetDeltatime();
+	double GetTime();
+	double FPS();
 };
