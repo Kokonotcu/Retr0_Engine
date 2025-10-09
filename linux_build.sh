@@ -1,3 +1,3 @@
-xmake f -m release -p linux
+xmake f -m debug -p linux
 xmake
 xmake run retr0_engine
