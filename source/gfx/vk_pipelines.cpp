@@ -42,7 +42,7 @@ void GraphicsPipeline::ClearPipeline()
 void GraphicsPipeline::CreateVertexShaderModule(const char* fileName)
 {
 	if (FileManager::ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(fileName).string(), device, &vertexShader))
-		fmt::print("Error when building the vertex shader \n");
+		retro::print("Error when building the vertex shader \n");
 	
 	vertexShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	vertexShaderStageInfo.pNext = nullptr;
@@ -54,7 +54,7 @@ void GraphicsPipeline::CreateVertexShaderModule(const char* fileName)
 void GraphicsPipeline::CreateFragmentShaderModule(const char* filePath)
 {
 	if (!FileManager::ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(filePath).string(), device, &fragmentShader))
-		fmt::print("Error when building the fragment shader \n");
+		retro::print("Error when building the fragment shader \n");
 	
 	fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	fragmentShaderStageInfo.pNext = nullptr;

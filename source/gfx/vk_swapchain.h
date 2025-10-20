@@ -8,7 +8,6 @@ class Swapchain
 {
 public:
 	Swapchain() = default;
-	//~Swapchain();
 
 	void SetProperties(VmaAllocator _allocator, VkPhysicalDevice gpu, VkDevice _device, VkSurfaceKHR _surface, VkExtent2D dim)
 	{
@@ -36,7 +35,6 @@ private:
 
 	void Clear(); //does not destroy renderpass
 public:
-	//getters
 	VkRenderPass GetRenderPass()
 	{
 		return renderPass;
@@ -57,14 +55,17 @@ public:
 	{
 		return imagePresentSemaphores[imageIndex];
 	}
+	bool IsGood()
+	{
+		return swapchainStatus;
+	}
 
 private:
 	VkFormat pick_depth_format();
 	VkFormat find_supported_format(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
 	void createDepthResources();
-	
-	
+
 private:
 	VkPhysicalDevice chosenGPU; 
 	VkDevice device; 
@@ -82,6 +83,7 @@ private:
 	std::vector<VkFramebuffer> framebuffers;
 	
 	retro::Image drawImage;
+	VkFormat depthFormat;
 	std::vector<retro::Image> depthImages;
 	VkExtent2D drawExtent;
 
@@ -89,5 +91,5 @@ private:
 	DeletionQueue destroyQueue;
 
 private:
-	VkFormat depthFormat;
+	bool swapchainStatus = false;
 };

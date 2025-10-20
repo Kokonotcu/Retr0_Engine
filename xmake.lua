@@ -14,8 +14,9 @@ if is_mode("release") then
     set_strip ("all")
     set_optimize("fastest")
     add_cxflags("-O3", "-DNDEBUG")
-    --remove_cxflags("-march=native", "-mavx2", "-msse4.2", {force = true})
-    add_cxflags("-msse4.2", "-mpclmul")
+	if not is_plat("android") and is_arch("x86_64") then
+		add_cxflags("-msse4.2", "-mpclmul", {force = true})
+	end
 end
 
 
@@ -28,8 +29,22 @@ add_requires("pkgconfig::vulkan",  {system = true, optional = true})
 add_requires("pkgconfig::sdl3",    {system = true, optional = true})
 add_requires("pkgconfig::shaderc", {system = true, optional = true})
 
+option("use_xrepo_sdl3")
+    set_default(true)
+    set_showmenu(true)
+option_end()
+
+if is_plat("android") then
+    add_requires("libsdl3", {configs = {shared = false}})
+	add_requires("shaderc", {configs = {shared = false}})
+end
+
 target("retr0_engine")
-    set_kind("binary")
+    if is_plat("android") then
+        set_kind("shared")
+    else
+        set_kind("binary")
+    end
 
     -- Your sources
     add_includedirs("source", {public = true})
@@ -55,7 +70,7 @@ target("retr0_engine")
 		"external/SDL/include",
         {public = true}
     )
-    add_defines("FMT_HEADER_ONLY")
+    
 
     add_files(
         "external/imgui/imgui.cpp",
@@ -71,6 +86,9 @@ target("retr0_engine")
 
     -- -------------------- Linux --------------------
     if is_plat("linux") then
+		
+		add_defines("FMT_HEADER_ONLY")
+	
     -- pthread/dl and (optionally) the LLD linker
     	add_syslinks("pthread", "dl")
     	add_ldflags("-fuse-ld=lld", {tools = {"cc", "cxx", "ld"}, force = false})
@@ -100,30 +118,49 @@ target("retr0_engine")
         -- copy your data folders (creates out/assets and out/shaders)
         	os.trycp(path.join(os.projectdir(), "assets"),  out)
         	os.trycp(path.join(os.projectdir(), "shaders"), out)
-
-        -- OPTIONAL: if you want to bundle system .so next to the exe, uncomment:
-        -- local function pkgvar(pkg, var)
-        --     local ok, val = pcall(function()
-        --         return (os.iorunv("pkg-config", {"--variable=" .. var, pkg})):trim()
-        --     end)
-        --     if ok and val and #val > 0 then return val end
-        -- end
-        -- local sdl_libdir = pkgvar("sdl3", "libdir")
-        -- if sdl_libdir then os.trycp(path.join(sdl_libdir, "libSDL3*.so*"), out) end
-        -- local sh_libdir = pkgvar("shaderc", "libdir")
-        -- if sh_libdir then os.trycp(path.join(sh_libdir, "libshaderc*.so*"), out) end
+			
     	end)
     end
+	
+	    -- ========= Android (NDK agnostic) =========
+    if is_plat("android") then
+        -- We already set_kind("shared") above
+        -- Vulkan rule added links/defines/syslinks
+		set_basename("main")
+		
+		add_links("vulkan")
+		
+        -- Prefer xrepo sdl3 if available; else fall back to vendored per-ABI .so
+        local use_xrepo = has_config("use_xrepo_sdl3") and has_package("libsdl3")
+		if use_xrepo then
+			add_packages("libsdl3")
+			add_packages("shaderc")
+        else
+			print(false, "libsdl3 not found (pkg-config sdl3). Install it.")
+        end
 
+		--local proj = os.projectdir()
+		--local androidDir = path.join(proj,"android-app")
+		--local appDir = path.join(androidDir,"app")
+		
+		--os.cp(path.join(os.projectdir(),"shaders"), path.join(os.projectdir(),out))
+		
+        -- Copy assets/shaders next to libmain.so (useful for manual pushing/tests)
+        after_build(function (t)
+            local out = t:targetdir()
+            os.trycp(path.join(os.projectdir(), "assets"),  out)
+            os.trycp(path.join(os.projectdir(), "shaders"), out)
+        end)
+    end
 
     -- -------------------- Windows (MSVC, vendored SDL) --------------------
     if is_plat("windows") then
-	
+		
+		add_defines("FMT_HEADER_ONLY")
+		
         set_toolchains("msvc")
         add_cxflags("/MP")
         add_ldflags("/DEBUG")
-		
-
 
         -- Vulkan via LunarG SDK (headers + import lib)
         local vksdk = os.getenv("VULKAN_SDK")
@@ -195,6 +232,8 @@ target("retr0_engine")
 		-- Output name
 	if is_plat("windows") then
 		set_filename("retr0_engine.exe")
-	else
+	elseif is_plat("linux") then
 		set_filename("retr0_engine") -- ELF on Linux, no extension
+	elseif is_plat("android") then
+		set_filename("libmain.so")
 	end

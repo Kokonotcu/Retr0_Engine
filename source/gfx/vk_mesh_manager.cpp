@@ -8,9 +8,6 @@
 
 #define SIMDJSON_NO_INLINE
 #undef simdjson_inline
-#include <fastgltf/glm_element_traits.hpp>
-#include <fastgltf/parser.hpp>
-#include <fastgltf/tools.hpp>
 
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
@@ -23,7 +20,7 @@ namespace MeshManager
 		VulkanEngine* engine = nullptr;
 
         // the big buffers:
-		VkDeviceAddress globalVertexAddress = 0;
+		VkDeviceAddress globalVertexAddress = 0; // If using buffer device address
         retro::Buffer globalVertexBuffer;
         retro::Buffer globalIndexBuffer;
 		DeletionQueue deletionQueue;
@@ -44,7 +41,7 @@ namespace MeshManager
 
         if (engine == nullptr) 
         {
-			fmt::print("Error: MeshManager::Init() called with null engine pointer\n"); 
+            retro::print("Error: MeshManager::Init() called with null engine pointer\n");
             return;
         }
 
@@ -110,12 +107,15 @@ namespace MeshManager
         auto meshes = FileManager::ModelLoader::LoadMeshFromFile(filePath);
 
         if (meshes.size() <= 0 || modelIndex < 0 || modelIndex >= (int)meshes.size()) {
-            fmt::print("MeshManager: invalid modelIndex or load failed: {}\n", filePath.string());
+            retro::print("MeshManager: invalid modelIndex or load failed: " + filePath.string());
             return nullptr; // empty
         }
 
-        fmt::print("MeshManager: loaded mesh {} index amount: {} vertex amount: {} \n", modelIndex, meshes.at(modelIndex)->indices.size(), meshes.at(modelIndex)->vertices.size());
-        
+        retro::print("MeshManager: loaded mesh " + std::to_string(modelIndex));
+        retro::print("index amount : " + std::to_string(meshes.at(modelIndex)->indices.size()));
+		retro::print(" vertex amount : " + std::to_string(meshes.at(modelIndex)->vertices.size()));
+		retro::print("\n");
+
         const auto& m = meshes.at(modelIndex);
         const size_t vertexBytes = m->vertices.size() * sizeof(retro::Vertex);
         const size_t indexBytes = m->indices.size() * sizeof(uint32_t);
@@ -128,9 +128,7 @@ namespace MeshManager
         const VkDeviceSize vCap = globalVertexBuffer.info.size;
         const VkDeviceSize iCap = globalIndexBuffer.info.size;
         if (alignedVertexHead + vertexBytes > vCap || alignedIndexHead + indexBytes > iCap) {
-            fmt::print("MeshManager: out of space (need V:{} I:{}, have V:{} I:{})\n",
-                vertexBytes, indexBytes,
-                (size_t)(vCap - alignedVertexHead), (size_t)(iCap - alignedIndexHead));
+            retro::print("MeshManager: out of space ");
             return nullptr; // empty
         }
 
@@ -185,12 +183,15 @@ namespace MeshManager
         auto meshes = FileManager::ModelLoader::LoadMeshFromFile(filePath);
 
         if (meshes.size() <= 0 || modelIndex < 0 || modelIndex >= (int)meshes.size()) {
-            fmt::print("MeshManager: invalid modelIndex or load failed: {}\n", filePath.string());
+            retro::print("MeshManager: invalid modelIndex or load failed: " + filePath.string());
             return handle; // empty
         }
 
-		fmt::print("MeshManager: loaded mesh {} index amount: {} vertex amount: {} \n", modelIndex, meshes.at(modelIndex)->indices.size(), meshes.at(modelIndex)->vertices.size());
-        
+        retro::print("MeshManager: loaded mesh " + std::to_string(modelIndex));
+        retro::print("index amount : " + std::to_string(meshes.at(modelIndex)->indices.size()));
+        retro::print(" vertex amount : " + std::to_string(meshes.at(modelIndex)->vertices.size()));
+        retro::print("\n");
+
         const auto& m = meshes.at(modelIndex);
         const size_t vertexBytes = m->vertices.size() * sizeof(retro::Vertex);
         const size_t indexBytes = m->indices.size() * sizeof(uint32_t);
@@ -203,9 +204,7 @@ namespace MeshManager
         const VkDeviceSize vCap = globalVertexBuffer.info.size;
         const VkDeviceSize iCap = globalIndexBuffer.info.size;
         if (alignedVertexHead + vertexBytes > vCap || alignedIndexHead + indexBytes > iCap) {
-            fmt::print("MeshManager: out of space (need V:{} I:{}, have V:{} I:{})\n",
-                vertexBytes, indexBytes,
-                (size_t)(vCap - alignedVertexHead), (size_t)(iCap - alignedIndexHead));
+            retro::print("MeshManager: out of space ");
             return handle; // empty
         }
 

@@ -9,19 +9,19 @@
 #include <functional>
 #include <deque>
 
+#include <vulkan/vulkan.h>
+#include <tools/printer.h>
+
+#ifndef __ANDROID__
 #include <vulkan/vk_enum_string_helper.h>
 
-#include <fmt/core.h>
+#endif // __ANDROID__
+
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
+void VK_CHECK(VkResult);
 
-#define VK_CHECK(x)                                                     \
-    do {                                                                \
-        VkResult err = x;                                               \
-        if (err) {                                                      \
-            fmt::println("Detected Vulkan error: {}", string_VkResult(err)); \
-            abort();                                                    \
-        }                                                               \
-    } while (0)
+
+

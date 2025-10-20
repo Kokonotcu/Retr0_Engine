@@ -2,30 +2,26 @@
 #include <fstream>
 #include <filesystem>
 
-#define SIMDJSON_NO_INLINE
-#undef simdjson_inline
+#include <fastgltf/core.hpp>
+#include <fastgltf/tools.hpp>                 
 #include <fastgltf/glm_element_traits.hpp>
-#include <fastgltf/parser.hpp>
-#include <fastgltf/tools.hpp>
+
 #include <shaderc/shaderc.hpp>
-#include <fmt/core.h>
 
 #include "gfx/vk_debug.h"
 #include "resources/vk_mesh.h"
+#include <SDL3/SDL.h> 
 
 namespace fs = std::filesystem;
 namespace FileManager 
 {
+	std::vector<char> ReadAssetCrossPlatform(const std::string& relPath);
 	namespace path 
 	{
-		inline fs::path GetAssetsDirectory() { return "assets/"; };
+		inline fs::path GetAssetsDirectory() {return "assets/";}
 		inline fs::path GetAssetPath(std::string filename) { return GetAssetsDirectory().string() + filename; };
 		inline fs::path GetShadersDirectory() { return "shaders/"; };
 		inline fs::path GetShaderPath(std::string filename) { return GetShadersDirectory().string() + filename; };
-		//inline fs::path GetExecutablePath() { return ""; };
-		//inline fs::path GetExecutableDirectory() { return ""; };
-		//inline fs::path CalculateShaderPath(const std::string& shaderName) { return ""; };
-		//inline fs::path CalculateAssetPath(const std::string& assetName) { return ""; };
 	}
 	namespace ShaderCompiler
 	{

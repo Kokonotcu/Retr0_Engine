@@ -4,7 +4,6 @@
 #include <gfx/vk_initializers.h>
 #include <gfx/vk_pipelines.h>
 
-#include <resources/vk_descriptors.h>
 #include <resources/vk_images.h>
 #include <resources/vk_buffer.h>
 #include <resources/vk_push_constants.h>
@@ -62,7 +61,6 @@ private:
 	
 	void InitCommands();
 	void InitSyncStructures();
-	void InitDescriptors();
 	void InitPipelines();
 	void InitGlobalPipelines();
 	void RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);

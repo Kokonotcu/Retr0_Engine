@@ -1,62 +1,83 @@
 ﻿#include "vk_engine.h"
 #include <VkBootstrap.h>
 
-//#include "imgui.h"
-//#include "imgui_impl_sdl3.h"
-//#include "imgui_impl_vulkan.h"
-
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
  };
 
+
+#ifdef __ANDROID__
+static constexpr bool enableValidationLayers = false;
+#else
+static constexpr bool enableValidationLayers =
 #ifdef DEBUG
-    const bool enableValidationLayers = true;
- #else
-    const bool enableValidationLayers = false;
- #endif
+true
+#else
+false
+#endif
+;
+#endif
 
 void VulkanEngine::Init()
 {
+	
     // We initialize SDL and create a window with it. 
     SDL_Init(SDL_INIT_VIDEO);
-    
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
 
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "Portrait");
     window = SDL_CreateWindow(
         "Retr0 Engine",
         windowExtent.width,
         windowExtent.height,
         window_flags
     );
-   fmt::print("{}",SDL_GetError());
-   //SDL_SetWindowResizable(window, true);
+   retro::print(SDL_GetError());
+   SDL_SetWindowResizable(window, true);
    SDL_SetWindowFullscreenMode(window,NULL);
    SDL_SetWindowFullscreen(window, true);
 
+#ifdef __ANDROID__
+   VsyncEnabled = true;
+#endif // __ANDROID_API__
+
+    retro::print("Vulkan Engine: Initializing Vulkan\n");
     InitVulkan();
 
+    retro::print("Vulkan Engine: Initializing MeshManager\n");
     MeshManager::Init(this, 
-       64 * 1024 * 1024,   // 64MB vertex pool, 
+       64 * 1024 * 1024,   // 64MB vertex pool, ~2.000.000 vertices
        64 * 1024 * 1024 );   // 64MB index  pool
 
+
+    int w, h;
+    SDL_GetWindowSizeInPixels(window, &w, &h);
+    windowExtent.width = w;
+    windowExtent.height = h;
+
+    retro::print("Vulkan Engine: Initializing swapchain\n");
 	swapchain.SetProperties(allocator, chosenGPU, device, surface, windowExtent);
+    retro::print("Vulkan Engine: building swapchain\n");
 	swapchain.Build(VsyncEnabled);
 
-	InitDescriptors();
-
+    retro::print("Vulkan Engine: Initializing pipelines\n");
 	InitPipelines();
 
+    retro::print("Vulkan Engine: Initializing commands\n");
     InitCommands();
 
+	retro::print("Vulkan Engine: Initializing sync structures\n");
     InitSyncStructures();
-
+    
+	retro::print("Vulkan Engine: Initializing default mesh\n");
     InitDefaultMesh();
-
+    
     //everything went fine
     isInitialized = true;
 
 	frameTimer = Time::RequestTracker(1.0f);
 	printCheckerTimer = Time::RequestTracker(1.0f);
+    retro::print("Vulkan Engine: initialized\n");
 }
 
 bool VulkanEngine::CheckValidationLayerSupport()
@@ -107,7 +128,7 @@ void VulkanEngine::InitVulkan()
 #ifdef DEBUG
     if (!inst_ret)
     {
-		fmt::print("failed to create instance: {}\n", inst_ret.error().message());
+        retro::print("failed to create instance: " + inst_ret.error().message());
         return;
     }
 #endif // DEBUG
@@ -120,7 +141,8 @@ void VulkanEngine::InitVulkan()
 
     if (!SDL_Vulkan_CreateSurface(window, instance, NULL, &surface))
     {
-		fmt::print("failed to create surface: {}\n", SDL_GetError());
+        retro::print("failed to create surface: " );
+		retro::print(SDL_GetError());
         return;
     }
 
@@ -134,25 +156,35 @@ void VulkanEngine::InitVulkan()
     vkb::PhysicalDeviceSelector selector{ vkbInst };
 
     vkb::Result<vkb::PhysicalDevice>  phy_ret{ std::error_code()};
-    if ((major > 1) || (major ==1 && minor >= 2))
+    
+#ifdef __ANDROID__
+    phy_ret = selector
+        .set_minimum_version(1, 0)
+        .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
+        .set_surface(surface)
+        .select();
+    bufferDeviceAddress = false; 
+
+#else
+    if ((major > 1) || (major == 1 && minor >= 2))
     {
         //vulkan 1.2 features
         VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES }; //Take a look at this later, might need to change for older devices
-        features12.bufferDeviceAddress = true; // make this false if the device doesnt support it
-        features12.descriptorIndexing = false; // make this false if the device doesnt support it
+        features12.bufferDeviceAddress = true;
+        features12.descriptorIndexing = false;
 
-		bufferDeviceAddress = features12.bufferDeviceAddress;
+        bufferDeviceAddress = features12.bufferDeviceAddress;
 
         phy_ret = selector
             .set_minimum_version(1, 2)
             .set_required_features_12(features12)
             .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
-			.set_surface(surface)
+            .set_surface(surface)
             .select();
     }
     else
     {
-		bufferDeviceAddress = false;
+        bufferDeviceAddress = false;
 
         phy_ret = selector
             .set_minimum_version(1, 0)
@@ -160,17 +192,22 @@ void VulkanEngine::InitVulkan()
             .set_surface(surface)
             .select();
     }
-	bufferDeviceAddress = false; // TEMP OVERRIDE WHILE WE DONT HAVE THE PROPER FALLBACK PATH
+    bufferDeviceAddress = false;
+#endif // __ANDROID__
     
 #ifdef DEBUG
     if (!phy_ret)
     {
-        fmt::print("failed to select physical device: {}\n", phy_ret.error().message());
+        retro::print("failed to select physical device: " + phy_ret.error().message());
         return;
 	}
 #endif // DEBUG
 
-	vkb::PhysicalDevice physicalDevice = phy_ret.value();
+    vkb::PhysicalDevice physicalDevice;
+   
+     physicalDevice = phy_ret.value();
+    
+	
 
     //create the final vulkan device
     vkb::DeviceBuilder deviceBuilder{ physicalDevice };
@@ -179,7 +216,7 @@ void VulkanEngine::InitVulkan()
 #ifdef DEBUG
     if (!dev_ret)
     {
-        fmt::print("failed to create logical device: {}\n", dev_ret.error().message());
+        retro::print("failed to create logical device: " + dev_ret.error().message());
 		return;
 	}
 #endif // DEBUG
@@ -198,7 +235,7 @@ void VulkanEngine::InitVulkan()
 #ifdef DEBUG
     if (!gq_ret)
     {
-        fmt::print("failed to get graphics queue: {}\n", gq_ret.error().message());
+        retro::print("failed to get graphics queue: " + gq_ret.error().message());
 		return;
     }
 #endif // DEBUG
@@ -215,12 +252,12 @@ void VulkanEngine::InitVulkan()
 #ifdef DEBUG
     if ( !gqi_ret)
     {
-		fmt::print("failed to get graphics queue index: {}\n", gqi_ret.error().message());
+        retro::print("failed to get graphics queue index: "+ gqi_ret.error().message());
 		return;
     }
     if (!iqi_ret)
 	{
-        fmt::print("failed to attach self to graphics queue index: {}\n", iqi_ret.error().message());
+        retro::print("failed to attach self to graphics queue index: " + iqi_ret.error().message());
         return;
 	}
 #endif // DEBUG
@@ -242,7 +279,16 @@ void VulkanEngine::InitVulkan()
     VkPhysicalDeviceProperties props{};
     vkGetPhysicalDeviceProperties(chosenGPU, &props);
 
-    fmt::print("Vulkan Instance Version: {}.{}.{}\nSelected GPU: {}\nType: {}  (1=integrated, 2=discrete)\n", major, minor, patch, props.deviceName, (int)props.deviceType);
+    retro::print("Vulkan Instance Version: "+ std::to_string(major));
+	retro::print("." + std::to_string(minor));
+	retro::print("." + std::to_string(patch));
+    retro::print("\nSelected GPU: ");
+	retro::print(props.deviceName);
+	retro::print("\nType: ");
+	retro::print((int)props.deviceType);
+	retro::print("  (1=integrated, 2=discrete)\n");
+
+    //fmt::print("Vulkan Instance Version: {}.{}.{}\nSelected GPU: {}\nType: {}  (1=integrated, 2=discrete)\n", major, minor, patch, props.deviceName, (int)props.deviceType);
 #endif // DEBUG
 }
 
@@ -294,47 +340,7 @@ void VulkanEngine::InitSyncStructures()
 
 }
 
-void VulkanEngine::InitDescriptors()
-{
-    ////create a descriptor pool that will hold 10 sets with 1 image each
-    //std::vector<DescriptorAllocator::PoolSizeRatio> sizes =
-    //{
-    //    { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 }
-    //};
-    //
-    //globalDescriptorAllocator.InitPool(device, 10, sizes);
-    //
-    ////make the descriptor set layout for our compute draw
-    //{
-    //    DescriptorLayoutBuilder builder;
-    //    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    //    drawImageDescriptorLayout = builder.Build(device, VK_SHADER_STAGE_ALL_GRAPHICS);
-    //}
-    //
-    ////allocate a descriptor set for our draw image
-    //drawImageDescriptors = globalDescriptorAllocator.Allocate(device, drawImageDescriptorLayout);
-    //
-    //VkDescriptorImageInfo imgInfo{};
-    //imgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    //imgInfo.imageView = drawImage.imageView;
-    //
-    //VkWriteDescriptorSet drawImageWrite = {};
-    //drawImageWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    //drawImageWrite.pNext = nullptr;
-    //
-    //drawImageWrite.dstBinding = 0;
-    //drawImageWrite.dstSet = drawImageDescriptors;
-    //drawImageWrite.descriptorCount = 1;
-    //drawImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    //drawImageWrite.pImageInfo = &imgInfo;
-    //
-    //vkUpdateDescriptorSets(device, 1, &drawImageWrite, 0, nullptr);
-    //
-    ////make sure both the descriptor allocator and the new layout get cleaned up properly
-    //
-    //mainDeletionQueue.addPool(globalDescriptorAllocator.pool);
-    //mainDeletionQueue.addSetLayout(drawImageDescriptorLayout);
-}
+
 
 void VulkanEngine::InitPipelines()
 {
@@ -351,41 +357,47 @@ void VulkanEngine::InitGlobalPipelines()
     // -------------------------------------------------------------------------Vertex and Fragment Shader Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Dynamic State configuration-------------------------------------------------------------------------//
-	graphicsPipeline.CreateDynamicState();
+	graphicsPipeline.CreateDynamicState(); retro::print("Vulkan Engine: Dynamic State Enabled: Viewport, Scissor\n");
     // -------------------------------------------------------------------------Dynamic State configuration-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Vertex Input Stage-------------------------------------------------------------------------//
 	//graphicsPipeline.CreateBDAVertexInput();
-	graphicsPipeline.CreateClassicVertexInput();
+	graphicsPipeline.CreateClassicVertexInput(); retro::print("Vulkan Engine: Classic Vertex Input Enabled: Pos, Normal, UV\n");
     // -------------------------------------------------------------------------Vertex Input Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Input Assembly Stage-------------------------------------------------------------------------//
-	graphicsPipeline.CreateInputAssembly();
+	graphicsPipeline.CreateInputAssembly(); retro::print("Vulkan Engine: Input Assembly: Triangle List, No Restart\n");
     // -------------------------------------------------------------------------Input Assembly Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Rasterizer Stage-------------------------------------------------------------------------//
-	graphicsPipeline.CreateRasterizer();
+	graphicsPipeline.CreateRasterizer(); retro::print("Vulkan Engine: Rasterizer: Fill, Backface Cull, Clockwise Frontface\n");
     // -------------------------------------------------------------------------Rasterizer Stage-------------------------------------------------------------------------//
 
      // -------------------------------------------------------------------------Multisampling Stage-------------------------------------------------------------------------//
-	graphicsPipeline.CreateMultisampling();
+	graphicsPipeline.CreateMultisampling(); retro::print("Vulkan Engine: Multisampling: No multisampling\n");
      // -------------------------------------------------------------------------Multisampling Stage-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
 	//graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS);
     //graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_COMPARE_OP_LESS);
-    graphicsPipeline.CreateBlending(69, VK_COMPARE_OP_LESS);
+	graphicsPipeline.CreateBlending(69, VK_COMPARE_OP_LESS); retro::print("Vulkan Engine: Color Blending: No blending, Depth Testing: Less\n");
     // -------------------------------------------------------------------------Color Blending Stage-------------------------------------------------------------------------//
 
 	// -------------------------------------------------------------------------Pipeline Layout-------------------------------------------------------------------------//
-	graphicsPipeline.CreatePipelineLayout();
+	graphicsPipeline.CreatePipelineLayout(); retro::print("Vulkan Engine: Pipeline Layout: 1 Push Constant, Vertex Shader Stages\n");
     // -------------------------------------------------------------------------Pipeline Layout-------------------------------------------------------------------------//
 
     // -------------------------------------------------------------------------Pipeline Creation-------------------------------------------------------------------------//
-    graphicsPipeline.CreateGraphicsPipeline(swapchain.GetRenderPass());
+	graphicsPipeline.CreateGraphicsPipeline(swapchain.GetRenderPass()); retro::print("Vulkan Engine: Graphics Pipeline: Created\n");
     // -------------------------------------------------------------------------Pipeline Creation-------------------------------------------------------------------------//
 	mainDeletionQueue.addPipeline(graphicsPipeline.GetPipeline());
-    mainDeletionQueue.addPipelineLayout(graphicsPipeline.GetPipelineLayout());
+    mainDeletionQueue.addPipelineLayout(graphicsPipeline.GetPipelineLayout()); 
+
+#ifdef __ANDROID__
+    //auto ok = FileManager::ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath("default_vertex.vert.spv").string(), device, &module);
+    //SDL_Log("vert load: %s", ok ? "ok" : "fail");
+#endif // __ANDROID__
+
 }
 
 void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
@@ -412,7 +424,7 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 
     // View: camera at (0,0,5) looking at origin
     glm::mat4 view = glm::lookAt(
-        glm::vec3(0.0f, 0.0f,3.f),
+        glm::vec3(0.0f, 0.0f,5.f),
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f)
     );
@@ -423,7 +435,7 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     proj[1][1] *= -1.0f;
 
 	glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(0.1f, 1.0f, 0.0f));
-    testMesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(),MeshManager::GetGlobalVertexBuffer(), proj * view * rotation);
+    //testMesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(),MeshManager::GetGlobalVertexBuffer(), proj * view * rotation);
 
     rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(1.0f, 0.2f, 0.0f));
     testMesh2->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), proj * view * rotation);
@@ -499,6 +511,17 @@ void VulkanEngine::Draw()
 		selected = (selected + 1) % FRAME_OVERLAP;
     }
 
+    if (!swapchain.IsGood() )
+    {
+        int w, h;
+        SDL_GetWindowSizeInPixels(window, &w, &h);
+        windowExtent.width = w;
+        windowExtent.height = h;
+        swapchain.Recreate(windowExtent, VsyncEnabled);
+		retro::print("Swapchain not good, recreating\n");
+        return;
+    }
+
     uint32_t swapchainImageIndex;
     VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, frames[selected].renderSemaphore, nullptr, &swapchainImageIndex);
 
@@ -506,8 +529,7 @@ void VulkanEngine::Draw()
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
     {
         int w, h;
-        //SDL_GetRenderOutputSize(SDL_GetRenderer(window),&w,&h);
-        SDL_GetWindowSize(window, &w, &h);
+        SDL_GetWindowSizeInPixels(window, &w, &h);
         windowExtent.width = w;
         windowExtent.height = h;
         swapchain.Recreate(windowExtent,VsyncEnabled);
@@ -515,7 +537,8 @@ void VulkanEngine::Draw()
     }
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
     {
-        throw std::runtime_error("failed to acquire swap chain image!");
+        retro::print("vkAcquireNextImageKHR failed:\n");
+        throw std::runtime_error(": failed to acquire swap chain image!");
     }
 
     VK_CHECK(vkResetFences(device, 1, &frames[selected].renderFence));
@@ -555,12 +578,13 @@ void VulkanEngine::Draw()
 
     VkResult resultP = vkQueuePresentKHR(graphicsQueue, &presentInfo);    
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR  || framebufferResized)
+    if (resultP == VK_ERROR_OUT_OF_DATE_KHR  || framebufferResized || result == VK_ERROR_SURFACE_LOST_KHR)
     {
 		framebufferResized = false;
         int w, h;
         //SDL_GetRenderOutputSize(SDL_GetRenderer(window),&w,&h);
-        SDL_GetWindowSize(window, &w, &h);
+        //SDL_GetWindowSize(window, &w, &h);
+        SDL_GetWindowSizeInPixels(window, &w, &h);
         windowExtent.width = w;
         windowExtent.height = h;
         swapchain.Recreate(windowExtent,VsyncEnabled);
@@ -568,7 +592,8 @@ void VulkanEngine::Draw()
     }
     else if (resultP != VK_SUCCESS && resultP != VK_SUBOPTIMAL_KHR)
     {
-        throw std::runtime_error("failed to acquire swap chain image!");
+        retro::print("vkQueuePresentKHR failed:\n");
+        throw std::runtime_error(": failed to present the graphics queue!");
     }
 
     //increase the number of frames drawn
@@ -576,7 +601,9 @@ void VulkanEngine::Draw()
 
     if (printCheckerTimer->Check())
     {
-        fmt::print("Frame Time: {} ms\n", Time::GetDeltatime() * 1000.0);
+        retro::print("Frame Time: ");
+		retro::print((Time::GetDeltatime() * 1000.0));
+        retro::print("ms \n");
     }
 }
 
@@ -589,16 +616,22 @@ void VulkanEngine::Run()
     while (!bQuit) {
         // Handle events on queue
         while (SDL_PollEvent(&e) != 0) {
-                
             switch (e.type)
             {
+            case SDL_EVENT_DID_ENTER_BACKGROUND:
+			case SDL_EVENT_WINDOW_HIDDEN:
+			case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
             case SDL_EVENT_WINDOW_MINIMIZED:
                 stopRendering = true;
                 break;
+            case SDL_EVENT_DISPLAY_ORIENTATION:
             case SDL_EVENT_WINDOW_RESIZED:
+            case  SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 				framebufferResized = true;
                 break;
+            case  SDL_EVENT_WILL_ENTER_FOREGROUND:
             case SDL_EVENT_WINDOW_RESTORED:
+			case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
                 stopRendering = false;
                 break;
             case SDL_EVENT_QUIT:

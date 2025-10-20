@@ -33,26 +33,52 @@ namespace FileManager
 			std::vector<std::shared_ptr<retro::CPUMesh>> LoadGltfMeshes(fs::path filePath) 
             {
 #ifdef DEBUG
-                fmt::print("Loading GLTF: {}", filePath.string() + "\n");
+				retro::print("FileManager : Loading GLTF " + filePath.string() + "\n");
 #endif // DEBUG
+#ifdef __ANDROID__
+				auto bytes = ReadAssetCrossPlatform(filePath.string());
+				if (bytes.empty()) {
+					retro::print("FileManager : Failed to read {}\n", filePath.string());
+					return {};
+				}
+				constexpr size_t HARD_CAP = 256u * 1024u * 1024u;
+				if (bytes.size() > HARD_CAP) {
+					retro::print("FileManager : Refusing to parse {} ({} bytes > cap)\n",
+						filePath.string(), bytes.size());
+					return{};
+				}
 
-                fastgltf::GltfDataBuffer data;
-                data.loadFromFile(filePath);
+				auto data = fastgltf::GltfDataBuffer::FromBytes(
+					reinterpret_cast<const std::byte*>(bytes.data()), bytes.size());
+				if (data.error() != fastgltf::Error::None) {
+					retro::print("FileManager : GltfDataBuffer::FromBytes failed for {}\n", filePath.string());
+					return{};
+				}
+#else
+				auto data = fastgltf::GltfDataBuffer::FromPath(filePath);
+#endif // __ANDROID__
 
-                constexpr auto gltfOptions = fastgltf::Options::LoadGLBBuffers
-                    | fastgltf::Options::LoadExternalBuffers;
+                constexpr auto gltfOptions = fastgltf::Options::LoadExternalBuffers;
 
+				
                 fastgltf::Asset gltf;
                 fastgltf::Parser parser{};
 
-                auto load = parser.loadBinaryGLTF(&data, filePath.parent_path(), gltfOptions);
-                if (load) {
-                    gltf = std::move(load.get());
-                }
-                else {
-                    fmt::print("Failed to load glTF: {}", fastgltf::to_underlying(load.error()) + "\n");
-                    return {};
-                }
+
+				const auto ext = filePath.extension().string();
+				auto load = parser.loadGltf(data.get(), ".", gltfOptions, fastgltf::Category::All);
+				
+
+				
+				if (load) {
+					gltf = std::move(load.get());
+				}
+				else {
+					retro::print("FileManager : Failed to load glTF ");
+					retro::print(filePath.string().c_str());
+					//retro::print(std::to_string(fastgltf::to_underlying(load.error())).c_str());
+					return {};
+				}
 
                 std::vector<std::shared_ptr<retro::CPUMesh>> meshes;
 
@@ -85,61 +111,55 @@ namespace FileManager
 
                         // load vertex positions
                         {
-                            fastgltf::Accessor& posAccessor = gltf.accessors[p.findAttribute("POSITION")->second];
-                            meshes.back()->vertices.resize(meshes.back()->vertices.size() + posAccessor.count);
+							if (auto pos = p.findAttribute("POSITION")) {
+								auto& posAccessor = gltf.accessors[pos->accessorIndex];
+								meshes.back()->vertices.resize(meshes.back()->vertices.size() + posAccessor.count);
 
-                            fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, posAccessor,
-                                [&](glm::vec3 v, size_t index) {
-                                    retro::Vertex newvtx;
-                                    newvtx.position = v;
-                                    newvtx.normal = { 1, 0, 0 };
-                                    newvtx.color = glm::vec4{ 1.f };
-                                    newvtx.uv.x = 0;
-                                    newvtx.uv.y = 0;
-                                    meshes.back()->vertices[initial_vtx + index] = newvtx;
-                                });
+								fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, posAccessor,
+									[&](glm::vec3 v, size_t index) {
+										retro::Vertex newvtx;
+										newvtx.position = v;
+										newvtx.normal = { 1, 0, 0 };
+										newvtx.color = glm::u8vec4(255);
+										newvtx.uv.x = 0;
+										newvtx.uv.y = 0;
+										meshes.back()->vertices[initial_vtx + index] = newvtx;
+									});
+							}
                         }
 
-                        // load vertex normals
-                        auto normals = p.findAttribute("NORMAL");
-                        if (normals != p.attributes.end()) {
-
-                            fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, gltf.accessors[(*normals).second],
-                                [&](glm::vec3 v, size_t index) {
-                                    meshes.back()->vertices[initial_vtx + index].normal = v;
-                                });
-                        }
+						if (auto normals = p.findAttribute("NORMAL")) {
+							auto& nrmAccessor = gltf.accessors[normals->accessorIndex];
+							fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, nrmAccessor,
+								[&](glm::vec3 v, size_t index) {
+									meshes.back()->vertices[initial_vtx + index].normal = v;
+								});
+						}
 
 						// load UVs (float2 -> two 16-bit halfs)
-						auto uv = p.findAttribute("TEXCOORD_0");
-						if (uv != p.attributes.end()) 
-						{
-							fastgltf::iterateAccessorWithIndex<glm::vec2>(gltf, gltf.accessors[(*uv).second],
-								[&](glm::vec2 v, size_t index) 
-								{
+						if (auto uv = p.findAttribute("TEXCOORD_0")) {
+							auto& uvAccessor = gltf.accessors[uv->accessorIndex];
+							fastgltf::iterateAccessorWithIndex<glm::vec2>(gltf, uvAccessor,
+								[&](glm::vec2 v, size_t index) {
 									auto& vert = meshes.back()->vertices[initial_vtx + index];
-									vert.uv.x = glm::packHalf1x16(v.x); // uint16 half bits
-									vert.uv.y = glm::packHalf1x16(v.y); // uint16 half bits
+									vert.uv.x = glm::packHalf1x16(v.x);
+									vert.uv.y = glm::packHalf1x16(v.y);
 								});
 						}
 
 						// load vertex colors (float4 0..1 -> RGBA8 UNORM)
-						auto colors = p.findAttribute("COLOR_0");
-						if (colors != p.attributes.end()) 
-						{
-							fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, gltf.accessors[(*colors).second],
-								[&](glm::vec4 v, size_t index) 
-								{
-									auto& vert = meshes.back()->vertices[initial_vtx + index];
-									// Convert float[0..1] -> u8[0..255] (rounding & clamping)
-									vert.color = glm::u8vec4(
-										glm::clamp(int(v.r * 255.0f + 0.5f), 0, 255),
-										glm::clamp(int(v.g * 255.0f + 0.5f), 0, 255),
-										glm::clamp(int(v.b * 255.0f + 0.5f), 0, 255),
-										glm::clamp(int(v.a * 255.0f + 0.5f), 0, 255)
-									);
-								});
-						}
+						//if (auto colors = p.findAttribute("COLOR_")) {
+						//	auto& colAccessor = gltf.accessors[colors->accessorIndex];
+						//	fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, colAccessor,
+						//		[&](glm::vec4 v, size_t index) {
+						//			auto& vert = meshes.back()->vertices[initial_vtx + index];
+						//			vert.color = glm::u8vec4(
+						//				glm::clamp(int(v.r * 255.f + 0.5f), 0, 255),
+						//				glm::clamp(int(v.g * 255.f + 0.5f), 0, 255),
+						//				glm::clamp(int(v.b * 255.f + 0.5f), 0, 255),
+						//				glm::clamp(int(v.a * 255.f + 0.5f), 0, 255));
+						//		});
+						//}
                     }
 
                     // display the vertex normals
@@ -314,7 +334,9 @@ namespace FileManager
 			}
 			catch (const std::exception& e)
 			{
-				fmt::print("Shader compilation error: {}\n", e.what());
+				retro::print("Shader compilation error: ");
+				retro::print(e.what());
+				retro::print("\n");
 			}
 
 		}
@@ -323,47 +345,28 @@ namespace FileManager
 			VkDevice device,
 			VkShaderModule* outShaderModule)
 		{
-			// open the file. With cursor at the end
-			std::ifstream file(filePath, std::ios::ate | std::ios::binary);
-
-			if (!file.is_open()) {
+			// filePath should be relative, e.g. "shaders/triangle.vert.spv"
+			auto bytes = FileManager::ReadAssetCrossPlatform(filePath);
+			if (bytes.empty()) {
+				retro::print("LoadShaderModule: cannot read ");
+				retro::print(filePath);
 				return false;
 			}
 
-			// find what the size of the file is by looking up the location of the cursor
-			// because the cursor is at the end, it gives the size directly in bytes
-			size_t fileSize = (size_t)file.tellg();
-
-			// spirv expects the buffer to be on uint32, so make sure to reserve a int
-			// vector big enough for the entire file
-			std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
-
-			// put file cursor at beginning
-			file.seekg(0);
-
-			// load the entire file into the buffer
-			file.read((char*)buffer.data(), fileSize);
-
-			// now that the file is loaded into the buffer, we can close it
-			file.close();
-
-			// create a new shader module, using the buffer we loaded
-			VkShaderModuleCreateInfo createInfo = {};
-			createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-			createInfo.pNext = nullptr;
-
-			// codeSize has to be in bytes, so multply the ints in the buffer by size of
-			// int to know the real size of the buffer
-			createInfo.codeSize = buffer.size() * sizeof(uint32_t);
-			createInfo.pCode = buffer.data();
-
-			// check that the creation goes well.
-			VkShaderModule shaderModule;
-			if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+			// SPIR-V is uint32_t-aligned; copy into u32 buffer
+			if (bytes.size() % 4 != 0) {
+				retro::print("LoadShaderModule: " +  filePath + "size{} not multiple of 4" +  std::to_string(bytes.size()));
 				return false;
 			}
-			*outShaderModule = shaderModule;
-			return true;
+			std::vector<uint32_t> code(bytes.size() / 4);
+			std::memcpy(code.data(), bytes.data(), bytes.size());
+
+			VkShaderModuleCreateInfo ci{};
+			ci.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			ci.codeSize = bytes.size();
+			ci.pCode = code.data();
+
+			return vkCreateShaderModule(device, &ci, nullptr, outShaderModule) == VK_SUCCESS;
 		}
 
 		std::vector<char> readSPV(const fs::path& spvPath)
@@ -377,5 +380,34 @@ namespace FileManager
 			return buffer;
 		}
 
+	}
+	std::vector<char> ReadAssetCrossPlatform(const std::string& relPath)
+	{
+		
+#if defined(__ANDROID__)
+		retro::print("reading from: ");
+		retro::print(relPath.c_str());
+		size_t sz = 0;
+		void* mem = SDL_LoadFile(relPath.c_str(), &sz);   // relPath like "shaders/triangle.vert.spv"
+		if (!mem) {
+			retro::print("ReadAssetAll failed: " + relPath + SDL_GetError());
+			return {};
+		}
+		std::vector<char> out(sz);
+		std::memcpy(out.data(), mem, sz);
+		SDL_free(mem);
+		return out;
+#else
+		std::ifstream f(relPath, std::ios::binary | std::ios::ate);
+		if (!f.is_open()) {
+			retro::print("ReadAssetAll failed (desktop): " +  relPath);
+			return {};
+		}
+		auto sz = (size_t)f.tellg();
+		std::vector<char> out(sz);
+		f.seekg(0);
+		f.read(out.data(), sz);
+		return out;
+#endif
 	}
 }

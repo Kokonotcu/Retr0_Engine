@@ -5,22 +5,51 @@ void Swapchain::CreateSwapchain(uint32_t width, uint32_t height, bool Vsync)
     vkb::SwapchainBuilder swapchainBuilder{ chosenGPU,device,surface };
     vkb::Swapchain vkbSwapchain;
 
-    vkbSwapchain = swapchainBuilder
-        //.use_default_format_selection()
+    if (height == 0|| width == 0)
+    {
+        swapchainStatus = false;
+        return;
+	}
+
+    auto swapError = swapchainBuilder
         .set_desired_format(VkSurfaceFormatKHR{ .format = VK_FORMAT_B8G8R8A8_SRGB, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
         //use vsync present mode
         .set_desired_present_mode(Vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR)
         .set_desired_extent(width, height)
         .set_desired_min_image_count(4) // Sets the size of buffering (either triple or double is recommended and also change FRAME_OVERLAP in engine.h)
         .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
-        .build()
-        .value();
+        .build();
+
+	if (!swapError)
+    {
+        retro::print("failed to create swapchain: ");
+        retro::print(vkbSwapchain.extent.width);
+		retro::print("x");
+		retro::print(vkbSwapchain.extent.height);
+        imageFormat = VK_FORMAT_B8G8R8A8_SRGB;
+		extent = { width, height };
+		swapchainStatus = false;
+        return;
+    }
+
+    vkbSwapchain = swapError.value();
 
     imageFormat = vkbSwapchain.image_format;
     images = vkbSwapchain.get_images().value();
     imageViews = vkbSwapchain.get_image_views().value();
     extent = vkbSwapchain.extent;
     swapchain = vkbSwapchain.swapchain;
+    
+    if (vkbSwapchain.extent.width == 0 || vkbSwapchain.extent.height == 0)
+    {
+        swapchainStatus = false;
+        extent = { width, height };
+    }
+    else 
+    {
+        swapchainStatus = true;
+    }
+	return ;
 }
 
 void Swapchain::CreateRenderPass()
@@ -110,6 +139,7 @@ void Swapchain::Build(bool vsync)
 {
 	depthFormat = pick_depth_format();
     CreateSwapchain(extent.width, extent.height, vsync);
+    
     //draw image size will match the window
     VkExtent3D drawImageExtent = {
         extent.width,
@@ -142,6 +172,7 @@ void Swapchain::Build(bool vsync)
     VmaAllocationCreateInfo rimg_allocinfo = {};
     rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
 
     VK_CHECK(vmaCreateImage(allocator, &rimg_info, &rimg_allocinfo,
         &drawImage.image, &drawImage.allocation, nullptr));
@@ -180,6 +211,7 @@ void Swapchain::Build(bool vsync)
     if (renderPass == VK_NULL_HANDLE)
         CreateRenderPass();
     CreateFramebuffers(renderPass);
+
 }
 
 void Swapchain::Recreate(VkExtent2D dim, bool vsync)

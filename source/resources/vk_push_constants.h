@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include <vk_mem_alloc.h>
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
