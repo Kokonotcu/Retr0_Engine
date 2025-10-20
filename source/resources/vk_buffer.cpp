@@ -1,0 +1,28 @@
+#include "vk_buffer.h"
+
+retro::Buffer retro::CreateBuffer(VmaAllocator allocator, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+{
+    // allocate buffer
+    VkBufferCreateInfo bufferInfo = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    bufferInfo.pNext = nullptr;
+    bufferInfo.size = allocSize;
+    bufferInfo.usage = usage;
+
+    VmaAllocationCreateInfo vmaallocInfo = {};
+    vmaallocInfo.usage = memoryUsage;
+    if (!(memoryUsage == VmaMemoryUsage::VMA_MEMORY_USAGE_GPU_ONLY))
+        vmaallocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    
+    retro::Buffer newBuffer;
+
+    // allocate the buffer
+    VK_CHECK(vmaCreateBuffer(allocator, &bufferInfo, &vmaallocInfo, &newBuffer.buffer, &newBuffer.allocation,
+        &newBuffer.info));
+
+    return newBuffer;
+}
+
+void retro::DestroyBuffer(VmaAllocator allocator, const retro::Buffer& buffer)
+{
+    vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
+}

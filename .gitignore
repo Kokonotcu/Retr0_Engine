@@ -17,14 +17,17 @@
 #
 
 # (Optional) If you also want to keep Linux shared libs, uncomment:
-!*.so
-!**/*.so
+#!*.so
+#!**/*.so
 
 # (Optional) If you want xmake config tracked, uncomment:
 !/xmake.lua
 
 !*.bat
 !**/*.bat
+
+!*.sh
+!**/*.sh
 
 # Do not ignore self
 !**.gitignore
