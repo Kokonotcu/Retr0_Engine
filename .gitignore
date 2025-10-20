@@ -4,6 +4,7 @@
 # Allow directory traversal so we can unignore specific paths/files
 !*/
 
+
 # Keep these project folders
 !/[Ss]ource/**
 !/[Ee]xternal/**
@@ -31,3 +32,24 @@
 
 # Do not ignore self
 !**.gitignore
+
+.gradle/
+.idea/
+build/
+*/build/
+!gradle-wrapper.jar
+
+!*.jar
+!**/*.jar
+
+!*.java
+!**/*.java
+
+!*.aar
+!**/*.aar
+
+!*.xml
+!**/*.xml
+
+!*.gradle
+!**/*.gradle

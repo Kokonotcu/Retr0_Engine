@@ -1,0 +1,25 @@
+plugins {
+  id "com.android.library"
+  id "org.tboox.gradle-xmake-plugin"
+}
+
+android {
+  namespace "com.retr0engine.retr0.nativelib"
+  compileSdk 35
+
+  defaultConfig {
+    minSdk 26
+    targetSdk 35
+  }
+
+  // Drive native builds via xmake using your existing xmake.lua (relative path).
+  externalNativeBuild {
+    xmake {
+      path "../../xmake.lua"   // adjust if your xmake.lua is elsewhere
+      buildMode "release"      // maps to: xmake f -m release
+      abiFilters "arm64-v8a"   // add more (armeabi-v7a, x86_64) later if needed
+      sdkver 26                // NDK API level
+      logLevel "verbose"
+    }
+  }
+}

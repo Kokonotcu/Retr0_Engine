@@ -1,0 +1,15 @@
+pluginManagement {
+  repositories { gradlePluginPortal(); google(); mavenCentral() }
+  plugins {
+    id("com.android.application") version "8.7.0"
+    id("com.android.library") version "8.7.0"
+    // centralize the xmake-gradle plugin version too
+    id("org.tboox.gradle-xmake-plugin") version "1.2.3"
+  }
+}
+dependencyResolutionManagement {
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories { google(); mavenCentral() }
+}
+rootProject.name = "retr0"
+include(":app", ":nativelib")

@@ -1,0 +1,43 @@
+plugins {
+  id "com.android.application"
+}
+
+android {
+  namespace "com.retr0engine.retr0"
+  compileSdk 35
+
+  defaultConfig {
+    applicationId "com.retr0engine.retr0"
+    minSdk 27
+    targetSdk 35
+    versionCode 1
+    versionName "1.0"
+  }
+
+  buildTypes {
+    release { minifyEnabled false }
+    debug { 
+		debuggable true 
+		ndk { debugSymbolLevel 'FULL' }    // keep debug symbols
+		packagingOptions { doNotStrip "**/*.so" }
+		}
+  }
+
+  // SDL3 AAR may include native libs; we’re statically linking SDL, so exclude them.
+  packagingOptions {
+    jniLibs {
+      excludes += ["**/libSDL3*.so"]
+      // If you ever see libc++ duplicate errors, uncomment:
+      // pickFirsts += ["**/libc++_shared.so"]
+    }
+  }
+
+  // AAR uses Prefab; enabling won't hurt even if unused in your setup.
+  buildFeatures { prefab true }
+}
+
+dependencies {
+  implementation project(":nativelib")
+  // Place the SDL3 AAR file into app/libs as SDL3.aar (or adjust the name here)
+  implementation files("libs/SDL3.aar")
+}
