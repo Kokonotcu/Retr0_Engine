@@ -6,8 +6,10 @@ namespace Time
 	{
 		std::vector<std::shared_ptr<TimeTracker>> trackers;
 		double deltaTime = 0.0;
-		auto last = std::chrono::high_resolution_clock::now(); //std::chrono::steady_clock::now(); 
-		double average[150] = { 0.0 }; int i = 0;
+		auto last = std::chrono::steady_clock::now(); //std::chrono::steady_clock::now(); 
+		double ticklist[100] = { 0.0 };
+		double ticksum = 0.0;
+		int tickIndex = 0;
 	}
 
 	std::shared_ptr<TimeTracker> RequestTracker(float period)
@@ -20,14 +22,16 @@ namespace Time
 	void CalculateDeltaTime()
 	{
 		auto old = last;
-		last = std::chrono::high_resolution_clock::now(); //std::chrono::steady_clock::now();
+		last = std::chrono::steady_clock::now(); //std::chrono::steady_clock::now();
 		deltaTime = std::chrono::duration_cast<std::chrono::duration<double>> (last - old).count() ;
 
 		for (auto &t : trackers)
 			t->CalculateTime();
 
-		average[i] = (deltaTime);
-		i = (i + 1) % 150;
+		ticksum -= ticklist[tickIndex];
+		ticksum += deltaTime;
+		ticklist[tickIndex] = (deltaTime);
+		tickIndex = (tickIndex + 1) % 100;
 	}
 	double GetDeltatime()
 	{
@@ -39,12 +43,7 @@ namespace Time
 	}
 	double FPS()
 	{
-		double sum = 0.0;
-		for (int x = 0; x < 150; x++)
-		{
-			sum += average[x];
-		}
-		return 1.0 / (sum / 150.0);
+		return (1.0 / (ticksum / 100.0));
 	}
 
 

@@ -30,7 +30,7 @@ struct FrameCommander
 	VkCommandPool commandPool;
 	VkCommandBuffer mainCommandBuffer;
 
-	VkSemaphore renderSemaphore;
+	VkSemaphore renderFinished;
 	VkFence renderFence;
 };
 

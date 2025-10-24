@@ -32,6 +32,8 @@ void VulkanEngine::Init()
         windowExtent.height,
         window_flags
     );
+    SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "1");
+
    retro::print(SDL_GetError());
    SDL_SetWindowResizable(window, true);
    SDL_SetWindowFullscreenMode(window,NULL);
@@ -320,20 +322,16 @@ void VulkanEngine::InitCommands()
 
 void VulkanEngine::InitSyncStructures()
 {
-    //create syncronization structures
-    //one fence to control when the gpu has finished rendering the frame,
-    //and 2 semaphores to syncronize rendering with swapchain
-    //we want the fence to start signalled so we can wait on it on the first frame
     VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
     VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
 
     for (int i = 0; i < FRAME_OVERLAP; i++) {
         VK_CHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &frames[i].renderFence));
 
-        VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frames[i].renderSemaphore));
+        VK_CHECK(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr, &frames[i].renderFinished));
 
 		mainDeletionQueue.addFence(frames[i].renderFence);
-		mainDeletionQueue.addSemaphore(frames[i].renderSemaphore);
+		mainDeletionQueue.addSemaphore(frames[i].renderFinished);
     }
     VK_CHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &immFence));
 	mainDeletionQueue.addFence(immFence);
@@ -502,13 +500,20 @@ void VulkanEngine::Cleanup()
 
 void VulkanEngine::Draw()
 {
-    selected = 0;
-    while (true)
+    selected = 0; bool flag =false;
+    for (int i = 0; i < 300; i++)
     {
-        if (vkGetFenceStatus(device, frames[selected].renderFence) == VK_SUCCESS)
+        if (vkGetFenceStatus(device, frames[selected].renderFence) == VK_SUCCESS) 
+        {
+            flag = true;
             break;
-        
-		selected = (selected + 1) % FRAME_OVERLAP;
+        }
+
+        selected = (selected + 1) % FRAME_OVERLAP;
+    }
+    if (!flag)
+    {
+        return;
     }
 
     if (!swapchain.IsGood() )
@@ -523,7 +528,7 @@ void VulkanEngine::Draw()
     }
 
     uint32_t swapchainImageIndex;
-    VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, frames[selected].renderSemaphore, nullptr, &swapchainImageIndex);
+    VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, frames[selected].renderFinished, VK_NULL_HANDLE, &swapchainImageIndex);
 
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -541,8 +546,6 @@ void VulkanEngine::Draw()
         throw std::runtime_error(": failed to acquire swap chain image!");
     }
 
-    VK_CHECK(vkResetFences(device, 1, &frames[selected].renderFence));
-
     VkCommandBuffer cmd = frames[selected].mainCommandBuffer;
     VK_CHECK(vkResetCommandBuffer(cmd, 0));
     
@@ -551,7 +554,7 @@ void VulkanEngine::Draw()
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = { frames[selected].renderSemaphore };
+    VkSemaphore waitSemaphores[] = { frames[selected].renderFinished };
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
@@ -559,10 +562,12 @@ void VulkanEngine::Draw()
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &cmd;
 
-    VkSemaphore signalSemaphores[] = { swapchain.GetSemaphore(swapchainImageIndex) };
+    VkSemaphore signalSemaphores[] = { swapchain.GetSemaphore(swapchainImageIndex)};
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
+
+    VK_CHECK(vkResetFences(device, 1, &frames[selected].renderFence));
     VK_CHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, frames[selected].renderFence));
 
     VkPresentInfoKHR presentInfo = {};
@@ -596,9 +601,6 @@ void VulkanEngine::Draw()
         throw std::runtime_error(": failed to present the graphics queue!");
     }
 
-    //increase the number of frames drawn
-    //frameNumber = (frameNumber + 1) % FRAME_OVERLAP;
-
     if (printCheckerTimer->Check())
     {
         retro::print("Frame Time: ");
@@ -618,11 +620,13 @@ void VulkanEngine::Run()
         while (SDL_PollEvent(&e) != 0) {
             switch (e.type)
             {
-            case SDL_EVENT_DID_ENTER_BACKGROUND:
+            case SDL_EVENT_WILL_ENTER_BACKGROUND:
 			case SDL_EVENT_WINDOW_HIDDEN:
 			case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
             case SDL_EVENT_WINDOW_MINIMIZED:
                 stopRendering = true;
+                //vkDeviceWaitIdle(device);
+                //swapchain.Destroy();
                 break;
             case SDL_EVENT_DISPLAY_ORIENTATION:
             case SDL_EVENT_WINDOW_RESIZED:
@@ -641,14 +645,17 @@ void VulkanEngine::Run()
         }
 
         // do not draw if we are minimized
-        if (stopRendering) {
+        if (stopRendering) 
+        {
             // throttle the speed to avoid the endless spinning
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
-
 		Time::CalculateDeltaTime();
-        Draw();
+        if (!stopRendering) 
+        {
+            Draw();
+        }
     }
 }
 

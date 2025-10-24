@@ -8,8 +8,17 @@ void Swapchain::CreateSwapchain(uint32_t width, uint32_t height, bool Vsync)
     if (height == 0|| width == 0)
     {
         swapchainStatus = false;
-        return;
+        retro::print("width or height is 0: ");
 	}
+
+	VkSurfaceCapabilitiesKHR caps;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(chosenGPU, surface, &caps);
+
+    if (caps.currentExtent.width == 0 || caps.currentExtent.height == 0)
+    {
+        swapchainStatus = false;
+        retro::print("caps current extent is 0: ");
+    }
 
     auto swapError = swapchainBuilder
         .set_desired_format(VkSurfaceFormatKHR{ .format = VK_FORMAT_B8G8R8A8_SRGB, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
@@ -29,7 +38,6 @@ void Swapchain::CreateSwapchain(uint32_t width, uint32_t height, bool Vsync)
         imageFormat = VK_FORMAT_B8G8R8A8_SRGB;
 		extent = { width, height };
 		swapchainStatus = false;
-        return;
     }
 
     vkbSwapchain = swapError.value();
@@ -112,6 +120,8 @@ void Swapchain::CreateRenderPass()
 
 void Swapchain::CreateFramebuffers(VkRenderPass renderPass)
 {
+    if (!swapchainStatus)
+        return;
     framebuffers.resize(imageViews.size());
 
     for (size_t i = 0; i < imageViews.size(); i++) {
@@ -303,5 +313,6 @@ void Swapchain::Destroy()
 
     Clear();
     vkDestroyRenderPass(device, renderPass, nullptr);
+	renderPass = VK_NULL_HANDLE;
 }
 
