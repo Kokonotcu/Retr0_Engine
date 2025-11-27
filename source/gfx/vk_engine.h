@@ -100,7 +100,8 @@ public:
 	bool framebufferResized = false;
 	bool stopRendering{ false };
 	bool VsyncEnabled{ false };
-	int selected = 0;
+	int selectedFrameBuf = 0;
+	bool flag = false;
 	//int frameNumber{ 0 };
 
 	//Mesh Stuff

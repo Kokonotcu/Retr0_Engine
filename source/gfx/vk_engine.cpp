@@ -36,8 +36,8 @@ void VulkanEngine::Init()
 
    retro::print(SDL_GetError());
    SDL_SetWindowResizable(window, true);
-   SDL_SetWindowFullscreenMode(window,NULL);
-   SDL_SetWindowFullscreen(window, true);
+   //SDL_SetWindowFullscreenMode(window,NULL);
+   //SDL_SetWindowFullscreen(window, true);
 
 #ifdef __ANDROID__
    VsyncEnabled = true;
@@ -500,23 +500,24 @@ void VulkanEngine::Cleanup()
 
 void VulkanEngine::Draw()
 {
-    selected = 0; bool flag =false;
+    selectedFrameBuf = 0; 
+    gpuAvailable = false;
     for (int i = 0; i < 300; i++)
     {
-        if (vkGetFenceStatus(device, frames[selected].renderFence) == VK_SUCCESS) 
+        if (vkGetFenceStatus(device, frames[selectedFrameBuf].renderFence) == VK_SUCCESS) 
         {
-            flag = true;
+            gpuAvailable = true;
             break;
         }
 
-        selected = (selected + 1) % FRAME_OVERLAP;
+        selectedFrameBuf = (selectedFrameBuf + 1) % FRAME_OVERLAP;
     }
-    if (!flag)
+    if (!gpuAvailable)
     {
         return;
     }
 
-    if (!swapchain.IsGood() )
+    if (!swapchain.IsGood())
     {
         int w, h;
         SDL_GetWindowSizeInPixels(window, &w, &h);
@@ -528,8 +529,7 @@ void VulkanEngine::Draw()
     }
 
     uint32_t swapchainImageIndex;
-    VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, frames[selected].renderFinished, VK_NULL_HANDLE, &swapchainImageIndex);
-
+    VkResult result = vkAcquireNextImageKHR(device, swapchain.GetSwapchain(), UINT64_MAX, frames[selectedFrameBuf].renderFinished, VK_NULL_HANDLE, &swapchainImageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -546,7 +546,7 @@ void VulkanEngine::Draw()
         throw std::runtime_error(": failed to acquire swap chain image!");
     }
 
-    VkCommandBuffer cmd = frames[selected].mainCommandBuffer;
+    VkCommandBuffer cmd = frames[selectedFrameBuf].mainCommandBuffer;
     VK_CHECK(vkResetCommandBuffer(cmd, 0));
     
 	RecordCommandBuffer(cmd, swapchainImageIndex);
@@ -554,7 +554,7 @@ void VulkanEngine::Draw()
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore waitSemaphores[] = { frames[selected].renderFinished };
+    VkSemaphore waitSemaphores[] = { frames[selectedFrameBuf].renderFinished };
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = waitSemaphores;
@@ -567,8 +567,8 @@ void VulkanEngine::Draw()
     submitInfo.pSignalSemaphores = signalSemaphores;
 
 
-    VK_CHECK(vkResetFences(device, 1, &frames[selected].renderFence));
-    VK_CHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, frames[selected].renderFence));
+    VK_CHECK(vkResetFences(device, 1, &frames[selectedFrameBuf].renderFence));
+    VK_CHECK(vkQueueSubmit(graphicsQueue, 1, &submitInfo, frames[selectedFrameBuf].renderFence));
 
     VkPresentInfoKHR presentInfo = {};
     presentInfo.pNext = nullptr;
