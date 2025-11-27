@@ -32,6 +32,8 @@
 
 # Do not ignore self
 !**.gitignore
+!**LICENSE
+!**NOTICE
 
 .gradle/
 .idea/
