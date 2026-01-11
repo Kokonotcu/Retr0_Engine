@@ -33,7 +33,7 @@ public:
 	template<typename vertexBufferType>
 	void CreateVertexShaderModule(const char* fileName)
 	{
-		if (!FileManager::ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(fileName).string(), device, &vertexShader))
+		if (!FileManager::ShaderCompiler::LoadShaderModule(FileManager::Path::GetShaderPath(fileName).string(), device, &vertexShader))
 		{
 			retro::print("Error when building the vertex shader \n");
 		}
@@ -52,7 +52,7 @@ public:
 	template<typename fragmentBufferType>
 	void CreateFragmentShaderModule(const char* filePath)
 	{
-		if (!FileManager::ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath(filePath).string(), device, &fragmentShader))
+		if (!FileManager::ShaderCompiler::LoadShaderModule(FileManager::Path::GetShaderPath(filePath).string(), device, &fragmentShader))
 		{
 			retro::print("Error when building the fragment shader \n");
 		}

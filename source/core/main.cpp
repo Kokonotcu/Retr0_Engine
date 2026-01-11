@@ -4,15 +4,18 @@ int retr0_main(int argc, char** argv);
 
 #ifdef __ANDROID__
 #include <SDL3/SDL_main.h>
-//#include <android/log.h>
-extern "C" int SDL_main(int argc, char** argv) {
-	try {
+extern "C" int SDL_main(int argc, char** argv) 
+{
+	try 
+	{
 		return retr0_main(argc, argv);
 	}
-	catch (const std::exception& e) {
+	catch (const std::exception& e) 
+	{
 		__android_log_print(retro::ANDROID_LOG_FATAL, "Retr0", "Uncaught exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...) 
+	{
 		__android_log_print(retro::ANDROID_LOG_FATAL, "Retr0", "Uncaught non-std exception");
 	}
 	return EXIT_FAILURE;
@@ -29,7 +32,7 @@ int retr0_main(int argc, char** argv)
 {
 
 #ifndef __ANDROID__
-	FileManager::ShaderCompiler::CompileFromDir(FileManager::path::GetShadersDirectory().string());
+	FileManager::ShaderCompiler::CompileFromDir(FileManager::Path::GetShadersDirectory().string());
 #endif
 
 	VulkanEngine engine;

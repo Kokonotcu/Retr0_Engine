@@ -20,24 +20,7 @@ false
 
 void VulkanEngine::Init()
 {
-	
-    // We initialize SDL and create a window with it. 
-    SDL_Init(SDL_INIT_VIDEO);
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
-
-    SDL_SetHint(SDL_HINT_ORIENTATIONS, "Portrait");
-    window = SDL_CreateWindow(
-        "Retr0 Engine",
-        windowExtent.width,
-        windowExtent.height,
-        window_flags
-    );
-    SDL_SetHint(SDL_HINT_ANDROID_BLOCK_ON_PAUSE, "1");
-
-   retro::print(SDL_GetError());
-   SDL_SetWindowResizable(window, true);
-   //SDL_SetWindowFullscreenMode(window,NULL);
-   //SDL_SetWindowFullscreen(window, true);
+	window.Init({ "Retr0 Engine", 800, 600, true });
 
 #ifdef __ANDROID__
    VsyncEnabled = true;
@@ -51,14 +34,8 @@ void VulkanEngine::Init()
        64 * 1024 * 1024,   // 64MB vertex pool, ~2.000.000 vertices
        64 * 1024 * 1024 );   // 64MB index  pool
 
-
-    int w, h;
-    SDL_GetWindowSizeInPixels(window, &w, &h);
-    windowExtent.width = w;
-    windowExtent.height = h;
-
     retro::print("Vulkan Engine: Initializing swapchain\n");
-	swapchain.SetProperties(allocator, chosenGPU, device, surface, windowExtent);
+    swapchain.SetProperties(allocator, chosenGPU, device, window.GetVulkanSurface(), { window.GetWindowExtent().width, window.GetWindowExtent().height } );
     retro::print("Vulkan Engine: building swapchain\n");
 	swapchain.Build(VsyncEnabled);
 
@@ -141,12 +118,7 @@ void VulkanEngine::InitVulkan()
     instance = vkbInst.instance;
     debugMessenger = vkbInst.debug_messenger;
 
-    if (!SDL_Vulkan_CreateSurface(window, instance, NULL, &surface))
-    {
-        retro::print("failed to create surface: " );
-		retro::print(SDL_GetError());
-        return;
-    }
+	window.CreateVulkanSurface(instance);
 
     uint32_t instanceVersion = 0;
     vkEnumerateInstanceVersion(&instanceVersion);
@@ -181,7 +153,7 @@ void VulkanEngine::InitVulkan()
             .set_minimum_version(1, 2)
             .set_required_features_12(features12)
             .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
-            .set_surface(surface)
+            .set_surface(window.GetVulkanSurface())
             .select();
     }
     else
@@ -191,7 +163,7 @@ void VulkanEngine::InitVulkan()
         phy_ret = selector
             .set_minimum_version(1, 0)
             .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
-            .set_surface(surface)
+            .set_surface(window.GetVulkanSurface())
             .select();
     }
     bufferDeviceAddress = false;
@@ -338,8 +310,6 @@ void VulkanEngine::InitSyncStructures()
 
 }
 
-
-
 void VulkanEngine::InitPipelines()
 {
 	InitGlobalPipelines();
@@ -388,14 +358,9 @@ void VulkanEngine::InitGlobalPipelines()
     // -------------------------------------------------------------------------Pipeline Creation-------------------------------------------------------------------------//
 	graphicsPipeline.CreateGraphicsPipeline(swapchain.GetRenderPass()); retro::print("Vulkan Engine: Graphics Pipeline: Created\n");
     // -------------------------------------------------------------------------Pipeline Creation-------------------------------------------------------------------------//
+
 	mainDeletionQueue.addPipeline(graphicsPipeline.GetPipeline());
     mainDeletionQueue.addPipelineLayout(graphicsPipeline.GetPipelineLayout()); 
-
-#ifdef __ANDROID__
-    //auto ok = FileManager::ShaderCompiler::LoadShaderModule(FileManager::path::GetShaderPath("default_vertex.vert.spv").string(), device, &module);
-    //SDL_Log("vert load: %s", ok ? "ok" : "fail");
-#endif // __ANDROID__
-
 }
 
 void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
@@ -445,8 +410,8 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 
 void VulkanEngine::InitDefaultMesh()
 {
-	testMesh = MeshManager::LoadMeshCPU(FileManager::path::GetAssetPath("basicmesh.glb"),1);
-    testMesh2 = MeshManager::LoadMeshCPU(FileManager::path::GetAssetPath("basicmesh.glb"), 2);
+	testMesh = MeshManager::LoadMeshCPU(FileManager::Path::GetAssetPath("basicmesh.glb"),1);
+    testMesh2 = MeshManager::LoadMeshCPU(FileManager::Path::GetAssetPath("basicmesh.glb"), 2);
 }
 
 void VulkanEngine::ImmediateSubmit(std::function<void(VkCommandBuffer _cmd)>&& function)
@@ -486,14 +451,13 @@ void VulkanEngine::Cleanup()
 
 		vmaDestroyAllocator(allocator);
 
-        vkDestroySurfaceKHR(instance, surface, nullptr);
+        vkDestroySurfaceKHR(instance, window.GetVulkanSurface(), nullptr);
         vkDestroyDevice(device, nullptr);
 
         vkb::destroy_debug_utils_messenger(instance, debugMessenger);
         vkDestroyInstance(instance, nullptr);
 
-
-        SDL_DestroyWindow(window);
+        window.Shutdown();
     }
 }
 
@@ -502,7 +466,8 @@ void VulkanEngine::Draw()
 {
     selectedFrameBuf = 0; 
     gpuAvailable = false;
-    for (int i = 0; i < 300; i++)
+
+    for (int i = 0; i < 240; i++)
     {
         if (vkGetFenceStatus(device, frames[selectedFrameBuf].renderFence) == VK_SUCCESS) 
         {
@@ -512,18 +477,12 @@ void VulkanEngine::Draw()
 
         selectedFrameBuf = (selectedFrameBuf + 1) % FRAME_OVERLAP;
     }
-    if (!gpuAvailable)
-    {
-        return;
-    }
+    if (!gpuAvailable) return;
+    
 
     if (!swapchain.IsGood())
     {
-        int w, h;
-        SDL_GetWindowSizeInPixels(window, &w, &h);
-        windowExtent.width = w;
-        windowExtent.height = h;
-        swapchain.Recreate(windowExtent, VsyncEnabled);
+        swapchain.Recreate({window.GetWindowExtent().width, window.GetWindowExtent().height }, VsyncEnabled);
 		retro::print("Swapchain not good, recreating\n");
         return;
     }
@@ -533,11 +492,7 @@ void VulkanEngine::Draw()
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        int w, h;
-        SDL_GetWindowSizeInPixels(window, &w, &h);
-        windowExtent.width = w;
-        windowExtent.height = h;
-        swapchain.Recreate(windowExtent,VsyncEnabled);
+        swapchain.Recreate({ window.GetWindowExtent().width, window.GetWindowExtent().height }, VsyncEnabled);
         return;
     }
     else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
@@ -583,16 +538,10 @@ void VulkanEngine::Draw()
 
     VkResult resultP = vkQueuePresentKHR(graphicsQueue, &presentInfo);    
 
-    if (resultP == VK_ERROR_OUT_OF_DATE_KHR  || framebufferResized || result == VK_ERROR_SURFACE_LOST_KHR)
+    if (resultP == VK_ERROR_OUT_OF_DATE_KHR  || window.IsResizePending() || result == VK_ERROR_SURFACE_LOST_KHR)
     {
-		framebufferResized = false;
-        int w, h;
-        //SDL_GetRenderOutputSize(SDL_GetRenderer(window),&w,&h);
-        //SDL_GetWindowSize(window, &w, &h);
-        SDL_GetWindowSizeInPixels(window, &w, &h);
-        windowExtent.width = w;
-        windowExtent.height = h;
-        swapchain.Recreate(windowExtent,VsyncEnabled);
+		window.ResizeHandled();
+        swapchain.Recreate({ window.GetWindowExtent().width, window.GetWindowExtent().height }, VsyncEnabled);
         return;
     }
     else if (resultP != VK_SUCCESS && resultP != VK_SUBOPTIMAL_KHR)
@@ -615,44 +564,20 @@ void VulkanEngine::Run()
     bool bQuit = false;
 
     // main loop
-    while (!bQuit) {
-        // Handle events on queue
-        while (SDL_PollEvent(&e) != 0) {
-            switch (e.type)
-            {
-            case SDL_EVENT_WILL_ENTER_BACKGROUND:
-			case SDL_EVENT_WINDOW_HIDDEN:
-			case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
-            case SDL_EVENT_WINDOW_MINIMIZED:
-                stopRendering = true;
-                //vkDeviceWaitIdle(device);
-                //swapchain.Destroy();
-                break;
-            case SDL_EVENT_DISPLAY_ORIENTATION:
-            case SDL_EVENT_WINDOW_RESIZED:
-            case  SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-				framebufferResized = true;
-                break;
-            case  SDL_EVENT_WILL_ENTER_FOREGROUND:
-            case SDL_EVENT_WINDOW_RESTORED:
-			case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
-                stopRendering = false;
-                break;
-            case SDL_EVENT_QUIT:
-                bQuit = true;
-                break;
-            }
-        }
+    while (!bQuit) 
+    {
+		bQuit = !window.ProcessEvents();
+
+		Time::CalculateDeltaTime();
 
         // do not draw if we are minimized
-        if (stopRendering) 
+        if (window.IsMinimized())
         {
             // throttle the speed to avoid the endless spinning
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
-		Time::CalculateDeltaTime();
-        if (!stopRendering) 
+        else
         {
             Draw();
         }

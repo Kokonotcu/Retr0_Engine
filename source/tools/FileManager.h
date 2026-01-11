@@ -16,7 +16,7 @@ namespace fs = std::filesystem;
 namespace FileManager 
 {
 	std::vector<char> ReadAssetCrossPlatform(const std::string& relPath);
-	namespace path 
+	namespace Path 
 	{
 		inline fs::path GetAssetsDirectory() {return "assets/";}
 		inline fs::path GetAssetPath(std::string filename) { return GetAssetsDirectory().string() + filename; };

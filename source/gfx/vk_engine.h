@@ -3,6 +3,7 @@
 #include <gfx/vk_debug.h>
 #include <gfx/vk_initializers.h>
 #include <gfx/vk_pipelines.h>
+#include <gfx/Window.h>
 
 #include <resources/vk_images.h>
 #include <resources/vk_buffer.h>
@@ -11,9 +12,6 @@
 
 #include <chrono>
 #include <thread>
-
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_vulkan.h>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -24,6 +22,8 @@
 #include "tools/FileManager.h"
 #include "gfx/vk_swapchain.h"
 #include "tools/Time.h"
+
+
 
 struct FrameCommander 
 {
@@ -54,7 +54,6 @@ public:
 
 	void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);   
 private:
-	//FrameCommander& get_current_frame() { return frames[frameNumber % FRAME_OVERLAP]; };
 
 	void InitVulkan();
 	bool CheckValidationLayerSupport();
@@ -67,12 +66,9 @@ private:
 
 	void InitDefaultMesh();
 
-	//submit a function to be executed immediately
 public:
 	///////////////////////////////////////////////////////////////
-	struct SDL_Window* window{ nullptr };
-	VkSurfaceKHR surface;// Vulkan window surface
-	VkExtent2D windowExtent{ 800 ,600 };
+	Window window;
 
 	VkInstance instance;// Vulkan library handle
 	VkDebugUtilsMessengerEXT debugMessenger;// Vulkan debug output handle
@@ -97,12 +93,9 @@ public:
 
 	bool bufferDeviceAddress;
 	bool isInitialized{ false };
-	bool framebufferResized = false;
-	bool stopRendering{ false };
 	bool VsyncEnabled{ false };
 	int selectedFrameBuf = 0;
-	bool flag = false;
-	//int frameNumber{ 0 };
+	bool gpuAvailable = false;
 
 	//Mesh Stuff
 	//retro::GPUMeshHandle testMesh;
