@@ -397,11 +397,15 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
     // Vulkan Y-flip (keep this if you’re not using a negative viewport height)
     proj[1][1] *= -1.0f;
 
-	glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(0.1f, 1.0f, 0.0f));
-    //testMesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(),MeshManager::GetGlobalVertexBuffer(), proj * view * rotation);
+    // Pre-compute common values to avoid redundant calculations
+    const float rotationAngle = glm::radians((float)frameTimer->GetTimePassed() * 80.0f);
+    const glm::mat4 viewProj = proj * view;
 
-    rotation = glm::rotate(glm::mat4(1.0f), glm::radians((float)frameTimer->GetTimePassed() * 80.0f), glm::vec3(1.0f, 0.2f, 0.0f));
-    testMesh2->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), proj * view * rotation);
+	//glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), rotationAngle, glm::vec3(0.1f, 1.0f, 0.0f));
+    //testMesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(),MeshManager::GetGlobalVertexBuffer(), viewProj * rotation);
+
+    glm::mat4 rotation = glm::rotate(glm::mat4(1.0f), rotationAngle, glm::vec3(1.0f, 0.2f, 0.0f));
+    testMesh2->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), viewProj * rotation);
 
     vkCmdEndRenderPass(commandBuffer);
     
@@ -410,8 +414,15 @@ void VulkanEngine::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 
 void VulkanEngine::InitDefaultMesh()
 {
-	testMesh = MeshManager::LoadMeshCPU(FileManager::Path::GetAssetPath("basicmesh.glb"),1);
-    testMesh2 = MeshManager::LoadMeshCPU(FileManager::Path::GetAssetPath("basicmesh.glb"), 2);
+    // Load both meshes from the same file in one pass to avoid duplicate file parsing
+    auto meshes = MeshManager::LoadMultipleMeshesCPU(FileManager::Path::GetAssetPath("basicmesh.glb"), {1, 2});
+    
+    if (meshes.size() >= 2) {
+        testMesh = meshes[0];
+        testMesh2 = meshes[1];
+    } else {
+        retro::print("Warning: Failed to load meshes from basicmesh.glb\n");
+    }
 }
 
 void VulkanEngine::ImmediateSubmit(std::function<void(VkCommandBuffer _cmd)>&& function)
@@ -467,7 +478,9 @@ void VulkanEngine::Draw()
     selectedFrameBuf = 0; 
     gpuAvailable = false;
 
-    for (int i = 0; i < 240; i++)
+    // Check all frame buffers once instead of up to 240 times
+    // This reduces unnecessary Vulkan API calls from O(240) to O(FRAME_OVERLAP)
+    for (int i = 0; i < FRAME_OVERLAP; i++)
     {
         if (vkGetFenceStatus(device, frames[selectedFrameBuf].renderFence) == VK_SUCCESS) 
         {

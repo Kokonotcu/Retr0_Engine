@@ -166,13 +166,15 @@ namespace FileManager
                     constexpr bool OverrideColors = true;
                     if (OverrideColors) 
 					{
+                        // Optimize color conversion: avoid redundant calculations
                         for (retro::Vertex& vtx : meshes.back()->vertices) 
 						{
-							glm::vec3 n01 = vtx.normal * 0.5f;
+                            // Pre-scale normal to [0,1] range, then to [0,255] in one step
+                            glm::vec3 normalScaled = (vtx.normal * 0.5f + 0.5f) * 255.0f;
 							vtx.color = glm::u8vec4(
-								(uint8_t)glm::clamp(int(n01.r * 255.0f + 0.5f), 0, 255),
-								(uint8_t)glm::clamp(int(n01.g * 255.0f + 0.5f), 0, 255),
-								(uint8_t)glm::clamp(int(n01.b * 255.0f + 0.5f), 0, 255),
+								(uint8_t)glm::clamp(normalScaled.r, 0.0f, 255.0f),
+								(uint8_t)glm::clamp(normalScaled.g, 0.0f, 255.0f),
+								(uint8_t)glm::clamp(normalScaled.b, 0.0f, 255.0f),
 								255
 							);
                         }

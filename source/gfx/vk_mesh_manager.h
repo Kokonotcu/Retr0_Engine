@@ -23,6 +23,9 @@ namespace MeshManager
     std::shared_ptr<retro::CPUMesh> LoadMeshCPU(std::filesystem::path filePath, int modelIndex);
     retro::GPUMeshHandle LoadMeshGPU(std::filesystem::path filePath, int modelIndex);
 
+    // Load multiple meshes from the same file efficiently (avoids duplicate file parsing)
+    std::vector<std::shared_ptr<retro::CPUMesh>> LoadMultipleMeshesCPU(std::filesystem::path filePath, const std::vector<int>& modelIndices);
+
 	// take a CPUMesh and transfer it to the GPU, returning a handle
     retro::GPUMeshHandle MakeGPU(const retro::CPUMesh& mesh);
 

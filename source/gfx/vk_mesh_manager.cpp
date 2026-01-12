@@ -175,6 +175,94 @@ namespace MeshManager
         return meshes.at(modelIndex);
     }
 
+    std::vector<std::shared_ptr<retro::CPUMesh>> LoadMultipleMeshesCPU(std::filesystem::path filePath, const std::vector<int>& modelIndices)
+    {
+        std::vector<std::shared_ptr<retro::CPUMesh>> result;
+        
+        // 1) Load the file once - this is the key optimization
+        auto meshes = FileManager::ModelLoader::LoadMeshFromFile(filePath);
+        
+        if (meshes.empty()) {
+            retro::print("MeshManager: failed to load file: " + filePath.string() + "\n");
+            return result;
+        }
+
+        // 2) Upload each requested mesh to GPU
+        for (int modelIndex : modelIndices) {
+            if (modelIndex < 0 || modelIndex >= (int)meshes.size()) {
+                retro::print("MeshManager: invalid modelIndex " + std::to_string(modelIndex) + " for file: " + filePath.string() + "\n");
+                result.push_back(nullptr);
+                continue;
+            }
+
+            const auto& m = meshes.at(modelIndex);
+            retro::print("MeshManager: loaded mesh " + std::to_string(modelIndex));
+            retro::print(" index amount: " + std::to_string(m->indices.size()));
+            retro::print(" vertex amount: " + std::to_string(m->vertices.size()));
+            retro::print("\n");
+
+            const size_t vertexBytes = m->vertices.size() * sizeof(retro::Vertex);
+            const size_t indexBytes = m->indices.size() * sizeof(uint32_t);
+
+            // Align heads before reserving space
+            const VkDeviceSize alignedVertexHead = Align(vertexHead, 16);
+            const VkDeviceSize alignedIndexHead = Align(indexHead, 4);
+
+            // Capacity check
+            const VkDeviceSize vCap = globalVertexBuffer.info.size;
+            const VkDeviceSize iCap = globalIndexBuffer.info.size;
+            if (alignedVertexHead + vertexBytes > vCap || alignedIndexHead + indexBytes > iCap) {
+                retro::print("MeshManager: out of space for mesh " + std::to_string(modelIndex) + "\n");
+                result.push_back(nullptr);
+                continue;
+            }
+
+            // Create staging buffer
+            retro::Buffer staging = retro::CreateBuffer(
+                engine->GetAllocator(),
+                vertexBytes + indexBytes,
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VMA_MEMORY_USAGE_CPU_ONLY
+            );
+
+            // Fill staging
+            uint8_t* mapped = static_cast<uint8_t*>(staging.allocation->GetMappedData());
+            memcpy(mapped + 0, m->vertices.data(), vertexBytes);
+            memcpy(mapped + vertexBytes, m->indices.data(), indexBytes);
+
+            // Upload to GPU
+            engine->ImmediateSubmit([&](VkCommandBuffer cmd) {
+                VkBufferCopy vCopy{};
+                vCopy.srcOffset = 0;
+                vCopy.dstOffset = alignedVertexHead;
+                vCopy.size = vertexBytes;
+                vkCmdCopyBuffer(cmd, staging.buffer, globalVertexBuffer.buffer, 1, &vCopy);
+
+                VkBufferCopy iCopy{};
+                iCopy.srcOffset = vertexBytes;
+                iCopy.dstOffset = alignedIndexHead;
+                iCopy.size = indexBytes;
+                vkCmdCopyBuffer(cmd, staging.buffer, globalIndexBuffer.buffer, 1, &iCopy);
+            });
+
+            // Set offsets
+            m->vertexOffset = alignedVertexHead;
+            m->indexOffset = alignedIndexHead;
+            m->indexCount = static_cast<uint32_t>(m->indices.size());
+
+            // Advance heads
+            vertexHead = alignedVertexHead + vertexBytes;
+            indexHead = alignedIndexHead + indexBytes;
+
+            // Cleanup staging
+            retro::DestroyBuffer(engine->GetAllocator(), staging);
+
+            result.push_back(m);
+        }
+
+        return result;
+    }
+
     retro::GPUMeshHandle LoadMeshGPU(std::filesystem::path filePath, int modelIndex)
     {
         retro::GPUMeshHandle handle{};
