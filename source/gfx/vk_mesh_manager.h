@@ -3,6 +3,7 @@
 #include "resources/vk_mesh.h"
 #include "resources/DeletionQueue.h"
 
+#include <vector>
 #include <unordered_map>
 #include <filesystem>
 
