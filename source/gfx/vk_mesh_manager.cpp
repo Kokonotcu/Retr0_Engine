@@ -188,7 +188,7 @@ namespace MeshManager
         }
 
         // 2) Upload each requested mesh to GPU
-        for (int modelIndex : modelIndices) {
+        for (const int modelIndex : modelIndices) {
             if (modelIndex < 0 || modelIndex >= (int)meshes.size()) {
                 retro::print("MeshManager: invalid modelIndex " + std::to_string(modelIndex) + " for file: " + filePath.string() + "\n");
                 result.push_back(nullptr);
@@ -197,8 +197,8 @@ namespace MeshManager
 
             const auto& m = meshes.at(modelIndex);
             retro::print("MeshManager: loaded mesh " + std::to_string(modelIndex));
-            retro::print(" index amount: " + std::to_string(m->indices.size()));
-            retro::print(" vertex amount: " + std::to_string(m->vertices.size()));
+            retro::print("index amount : " + std::to_string(m->indices.size()));
+            retro::print(" vertex amount : " + std::to_string(m->vertices.size()));
             retro::print("\n");
 
             const size_t vertexBytes = m->vertices.size() * sizeof(retro::Vertex);
