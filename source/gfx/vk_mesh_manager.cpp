@@ -1,7 +1,7 @@
 ﻿#include <gfx/vk_mesh_manager.h>
 #include "stb_image.h"
 
-#include "vk_engine.h"
+#include "gfx/Engine.h"
 #include "vk_initializers.h"
 #include "vk_debug.h"
 #include <glm/gtx/quaternion.hpp>
@@ -17,7 +17,7 @@ namespace MeshManager
 {
     namespace 
     {
-		VulkanEngine* engine = nullptr;
+		Engine* engine = nullptr;
 
         // the big buffers:
 		VkDeviceAddress globalVertexAddress = 0; // If using buffer device address
@@ -34,7 +34,7 @@ namespace MeshManager
         }
     }
 
-    void Init(VulkanEngine* _engine, size_t maxVertexBytes, size_t maxIndexBytes)
+    void Init(Engine* _engine, size_t maxVertexBytes, size_t maxIndexBytes)
     {
         engine = _engine;
 		deletionQueue.init(engine->GetDevice(), engine->GetAllocator());

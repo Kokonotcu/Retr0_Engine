@@ -8,12 +8,12 @@
 
 
 //forward declaration
-class VulkanEngine;
+class Engine;
 
 namespace MeshManager 
 {
     // create the big buffers once
-    void Init(VulkanEngine* engine, size_t maxVertexBytes, size_t maxIndexBytes);
+    void Init(Engine* engine, size_t maxVertexBytes, size_t maxIndexBytes);
 	void ClearBuffers();
 
     VkBuffer GetGlobalVertexBuffer();//

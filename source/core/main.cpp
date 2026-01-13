@@ -1,4 +1,4 @@
-#include <gfx/vk_engine.h>
+#include <gfx/Engine.h>
 
 int retr0_main(int argc, char** argv);
 
@@ -35,7 +35,7 @@ int retr0_main(int argc, char** argv)
 	FileManager::ShaderCompiler::CompileFromDir(FileManager::Path::GetShadersDirectory().string());
 #endif
 
-	VulkanEngine engine;
+	Engine engine;
 
 	engine.Init();
 	try
