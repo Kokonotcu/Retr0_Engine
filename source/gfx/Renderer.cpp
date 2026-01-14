@@ -83,7 +83,7 @@ void Renderer::InitPipelines()
 
 	// 1. Shaders
 	//graphicsPipeline.CreateVertexShaderModule<retro::GPUPushConstant>("default_vertex_BDA.vert.spv");
-	graphicsPipeline.CreateVertexShaderModule<retro::CPUPushConstant>("default_vertex.vert.spv");
+	graphicsPipeline.CreateVertexShaderModule<retro::CPUPushConstant>("light_shaded.vert.spv");
 	graphicsPipeline.CreateFragmentShaderModule("default_fragment.frag.spv");
 
 	// 2. Dynamic State
@@ -275,12 +275,17 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 			if (!mesh) continue;
 
 			glm::mat4 model = glm::mat4(1.f);
-			model = glm::rotate(model, glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(0, 1, 1));
+			model = glm::rotate(model, glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(-0.5f, 0, 1.0f));
 
 			// Calculate final MVP matrix
 			glm::mat4 meshMatrix = projection * view * model;
 
-			mesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), meshMatrix);
+			retro::CPUPushConstant cpuPushConstant{};
+
+			cpuPushConstant.worldMatrix = meshMatrix;
+			cpuPushConstant.model = model;
+
+			mesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), cpuPushConstant);
 			i++;
 		}
 	}

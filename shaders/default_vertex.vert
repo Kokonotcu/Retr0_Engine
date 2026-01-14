@@ -15,6 +15,7 @@ vec4 decodeColor(uint pack){ return unpackUnorm4x8(pack); }
 layout( push_constant ) uniform constants
 {	
 	mat4 render_matrix;
+	mat4 model;
 } PushConstants;
 
 void main() 

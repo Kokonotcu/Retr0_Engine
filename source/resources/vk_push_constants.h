@@ -15,5 +15,6 @@ namespace retro
     struct CPUPushConstant
     {
         glm::mat4 worldMatrix;
+        glm::mat4 model;
 	};
 }

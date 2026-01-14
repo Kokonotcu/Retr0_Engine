@@ -30,6 +30,6 @@ namespace FileManager
 	};
 	namespace ModelLoader
 	{
-		std::vector<std::shared_ptr<retro::CPUMesh>> LoadMeshFromFile(fs::path filePath);
+		std::vector<std::shared_ptr<retro::Mesh>> LoadMeshFromFile(fs::path filePath);
 	}
 }
