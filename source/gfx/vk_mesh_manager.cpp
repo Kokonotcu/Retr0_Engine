@@ -101,7 +101,7 @@ namespace MeshManager
         return globalIndexBuffer.buffer; 
     }
 
-    std::shared_ptr<retro::CPUMesh> LoadMeshCPU(std::filesystem::path filePath, int modelIndex)
+    std::shared_ptr<retro::Mesh> LoadMeshCPU(std::filesystem::path filePath, int modelIndex)
     {
         // 1) Load CPU-side mesh
         auto meshes = FileManager::ModelLoader::LoadMeshFromFile(filePath);
@@ -146,14 +146,14 @@ namespace MeshManager
         memcpy(mapped + vertexBytes, m->indices.data(), indexBytes);
 
         engine->ImmediateSubmit([&](VkCommandBuffer cmd) {
-            // vertices → global vertex buffer
+            // vertices  global vertex buffer
             VkBufferCopy vCopy{};
             vCopy.srcOffset = 0;
             vCopy.dstOffset = alignedVertexHead;
             vCopy.size = vertexBytes;
             vkCmdCopyBuffer(cmd, staging.buffer, globalVertexBuffer.buffer, 1, &vCopy);
 
-            // indices → global index buffer
+            // indices  global index buffer
             VkBufferCopy iCopy{};
             iCopy.srcOffset = vertexBytes;
             iCopy.dstOffset = alignedIndexHead;

@@ -45,6 +45,7 @@ void Engine::Init()
 	retro::print("Engine: Initializing default mesh\n");
     InitDefaultMesh();
 	renderer.AddRenderable(testMesh2);
+	renderer.AddRenderable(testMesh);
     
     //everything went fine
     isInitialized = true;
@@ -302,8 +303,6 @@ void Engine::ImmediateSubmit(std::function<void(VkCommandBuffer _cmd)>&& functio
 
     VkSubmitInfo submit = vkinit::submit_info(&cmd, nullptr, nullptr); //Take a look at this later, might need to change for older devices
 
-    // submit command buffer to the queue and execute it.
-    //  _renderFence will now block until the graphic commands finish execution
 	VK_CHECK(vkQueueSubmit(immediateQueue, 1, &submit, immFence));   //Take a look at this later, might need to change for older devices
 
     VK_CHECK(vkWaitForFences(device, 1, &immFence, true, UINT64_MAX));

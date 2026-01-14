@@ -57,12 +57,12 @@ public:
     // Handle window resizing
     void Resize(uint32_t width, uint32_t height);
 
-    void AddRenderable(const std::shared_ptr<retro::CPUMesh>& renderable) 
+    void AddRenderable(const std::shared_ptr<retro::Mesh>& renderable) 
     {
         renderables.push_back(renderable);
 	}
 
-    void RemoveRenderable(const std::shared_ptr<retro::CPUMesh>& renderable)
+    void RemoveRenderable(const std::shared_ptr<retro::Mesh>& renderable)
     {
         renderables.erase(std::remove(renderables.begin(), renderables.end(), renderable), renderables.end());
     }
@@ -98,5 +98,5 @@ private:
     
     DeletionQueue rendererDeletionQueue;
 
-    std::vector<std::shared_ptr<retro::CPUMesh>> renderables;
+    std::vector<std::shared_ptr<retro::Mesh>> renderables;
 };

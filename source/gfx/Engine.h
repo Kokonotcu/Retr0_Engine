@@ -75,8 +75,8 @@ public:
 	//retro::GPUMeshHandle testMesh;
 	//retro::GPUMeshHandle testMesh2;
 
-	std::shared_ptr<retro::CPUMesh> testMesh;
-	std::shared_ptr<retro::CPUMesh> testMesh2;
+	std::shared_ptr<retro::Mesh> testMesh;
+	std::shared_ptr<retro::Mesh> testMesh2;
 private:
 	bool engineDebug = true;
 

@@ -31,7 +31,7 @@ namespace retro
         virtual void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, glm::mat4x4 worldMatrix) = 0;
     };
 
-	struct Mesh : public Drawable
+	struct MeshBase : public Drawable
     {
         // where this mesh lives inside the mega buffers:
         VkDeviceSize vertexOffset = 0; // bytes
@@ -42,7 +42,7 @@ namespace retro
         std::vector<Submesh> submeshes;
     };
 
-    struct GPUMeshHandle : public Mesh
+    struct GPUMeshHandle : public MeshBase
     {
         VkDeviceAddress vertexBufferAddress;
 		retro::GPUPushConstant gpuPushConstant;
@@ -60,14 +60,14 @@ namespace retro
 		}
     };
 
-    struct CPUMesh : public Mesh 
+    struct Mesh : public MeshBase 
     {
         std::vector<retro::Vertex> vertices;
         std::vector<uint32_t> indices;
 
 		retro::CPUPushConstant cpuPushConstant;
 
-        ~CPUMesh()
+        ~Mesh()
         {
             vertices.clear();
             indices.clear();
@@ -75,6 +75,7 @@ namespace retro
             name = "";
 		}
 
+        // Take this call out of Mesh classes put them in renderComponents
         void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, glm::mat4x4 worldMatrix) override 
         {
             cpuPushConstant.worldMatrix = worldMatrix;
