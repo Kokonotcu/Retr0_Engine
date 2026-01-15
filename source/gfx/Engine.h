@@ -83,5 +83,8 @@ private:
 	DeletionQueue mainDeletionQueue;
 
 	Engine* loadedEngine = nullptr;
+
+public:
+	glm::vec4 params;
 };
 

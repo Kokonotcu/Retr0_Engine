@@ -83,8 +83,8 @@ void Renderer::InitPipelines()
 
 	// 1. Shaders
 	//graphicsPipeline.CreateVertexShaderModule<retro::GPUPushConstant>("default_vertex_BDA.vert.spv");
-	graphicsPipeline.CreateVertexShaderModule<retro::CPUPushConstant>("light_shaded.vert.spv");
-	graphicsPipeline.CreateFragmentShaderModule("default_fragment.frag.spv");
+	graphicsPipeline.CreateVertexShaderModule<retro::CPUPushConstant>("default_vertex.vert.spv");
+	graphicsPipeline.CreateFragmentShaderModule<retro::CPUPushConstant>("hex.frag.spv");
 
 	// 2. Dynamic State
 	graphicsPipeline.CreateDynamicState();
@@ -103,8 +103,8 @@ void Renderer::InitPipelines()
 	graphicsPipeline.CreateMultisampling();
 
 	// 7. Blending (No blending, Depth Less)
-	//graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS); Transparency Additive
-	//graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_COMPARE_OP_LESS); Transparency Alpha Blending
+	//graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS); //Transparency Additive
+	//graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_COMPARE_OP_LESS); //Transparency Alpha Blending
 	graphicsPipeline.CreateBlending(69, VK_COMPARE_OP_LESS);
 
 	// 8. Pipeline Layout
@@ -123,7 +123,7 @@ void Renderer::Resize(uint32_t width, uint32_t height)
 	swapchain.Recreate({ width, height }, vsyncEnabled);
 }
 
-void Renderer::Draw()
+void Renderer::Draw(glm::vec4 params)
 {
 	// Instead of a fixed round-robin, this searches for the first available fence
 	selectedFrameBuf = 0;
@@ -172,7 +172,7 @@ void Renderer::Draw()
 	VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
 	// Pass renderables to the recording function
-	RecordCommandBuffer(cmd, swapchainImageIndex);
+	RecordCommandBuffer(cmd, swapchainImageIndex, params);
 
 	// Submit Frame
 	VkSubmitInfo submitInfo{};
@@ -227,7 +227,7 @@ void Renderer::Draw()
 	}
 }
 
-void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
+void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, glm::vec4 params)
 {
 	VkCommandBufferBeginInfo beginInfo = vkinit::command_buffer_begin_info();
 	VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
@@ -254,7 +254,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
 
 	// --- Camera Setup (Basic fixed camera for now) ---
-	glm::vec3 camPos = { 0.f, 0.f, -5.f };
+	glm::vec3 camPos = { 0.f, 0.f, -3.f };
 	glm::mat4 view = glm::translate(glm::mat4(1.f), camPos);
 
 	float aspect = (float)swapchain.GetExtent().width / (float)swapchain.GetExtent().height;
@@ -274,6 +274,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 		{
 			if (!mesh) continue;
 
+
 			glm::mat4 model = glm::mat4(1.f);
 			model = glm::rotate(model, glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(-0.5f, 0, 1.0f));
 
@@ -284,6 +285,10 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
 			cpuPushConstant.worldMatrix = meshMatrix;
 			cpuPushConstant.model = model;
+
+			params = glm::vec4(rotationTimer, 1.6f, 0.05f, 1.0f);
+
+			cpuPushConstant.params = params;
 
 			mesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), cpuPushConstant);
 			i++;

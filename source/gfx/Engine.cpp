@@ -353,7 +353,7 @@ void Engine::Run()
         else
         {
 			//renderer.Draw({ testMesh, testMesh2 });
-			renderer.Draw();
+			renderer.Draw(params);
         }
     }
 }

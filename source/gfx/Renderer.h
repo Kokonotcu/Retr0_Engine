@@ -52,7 +52,7 @@ public:
     void Shutdown();
 
     // The main draw command
-    void Draw();
+    void Draw(glm::vec4 params);
 
     // Handle window resizing
     void Resize(uint32_t width, uint32_t height);
@@ -72,7 +72,7 @@ private:
     void InitCommands();
     void InitSyncStructures();
     void InitPipelines();
-    void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex);
+    void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, glm::vec4 params);
 
 private:
     // References to external objects (We don't own these)
