@@ -30,7 +30,7 @@ namespace FileManager
                 return ModelExtension::NOTSUPPORTED;
             }
 
-			std::vector<std::shared_ptr<retro::CPUMesh>> LoadGltfMeshes(fs::path filePath) 
+			std::vector<std::shared_ptr<retro::Mesh>> LoadGltfMeshes(fs::path filePath) 
             {
 #ifdef DEBUG
 				retro::print("FileManager : Loading GLTF " + filePath.string() + "\n");
@@ -80,12 +80,12 @@ namespace FileManager
 					return {};
 				}
 
-                std::vector<std::shared_ptr<retro::CPUMesh>> meshes;
+                std::vector<std::shared_ptr<retro::Mesh>> meshes;
 
                 for (fastgltf::Mesh& gltfMesh : gltf.meshes) 
 				{
 
-					meshes.push_back(std::make_shared<retro::CPUMesh>());
+					meshes.push_back(std::make_shared<retro::Mesh>());
 					meshes.back()->name = gltfMesh.name;
 
                     for (auto&& p : gltfMesh.primitives) {
@@ -183,7 +183,7 @@ namespace FileManager
             }
 		}
 	    
-		std::vector<std::shared_ptr<retro::CPUMesh>> LoadMeshFromFile(fs::path filePath)
+		std::vector<std::shared_ptr<retro::Mesh>> LoadMeshFromFile(fs::path filePath)
 		{
 			switch (DetermineExtension(filePath.extension().string()))
 			{
@@ -205,7 +205,7 @@ namespace FileManager
 			return {};
 		}
 
-}
+	}
 
 	namespace ShaderCompiler
 	{

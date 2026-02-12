@@ -40,6 +40,8 @@ struct FrameData
 	VkFence renderFence;
 };
 
+constexpr unsigned int FRAME_OVERLAP = 3;
+
 class Renderer 
 {
 public:
@@ -57,21 +59,22 @@ public:
     // Handle window resizing
     void Resize(uint32_t width, uint32_t height);
 
-    void AddRenderable(const std::shared_ptr<retro::CPUMesh>& renderable) 
+    void AddRenderable(const std::shared_ptr<retro::Mesh>& renderable) 
     {
         renderables.push_back(renderable);
 	}
 
-    void RemoveRenderable(const std::shared_ptr<retro::CPUMesh>& renderable)
+    void RemoveRenderable(const std::shared_ptr<retro::Mesh>& renderable)
     {
         renderables.erase(std::remove(renderables.begin(), renderables.end(), renderable), renderables.end());
     }
 
 private:
-    // Internal helpers moved from Engine
     void InitCommands();
     void InitSyncStructures();
     void InitPipelines();
+    
+private:
     void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex);
 
 private:
@@ -82,21 +85,21 @@ private:
     // Renderer-owned resources
     Swapchain swapchain;
     GraphicsPipeline graphicsPipeline; // Could be a map/manager later
+    DeletionQueue rendererDeletionQueue;
 
-    static constexpr unsigned int FRAME_OVERLAP = 3;
+    // Frame management
+    FrameData frames[FRAME_OVERLAP];
+
+    //Timers
+    std::shared_ptr<Time::TimeTracker> frameTimer;
+    std::shared_ptr<Time::TimeTracker> printCheckerTimer;
+
+    //Actual Data
+    std::vector<std::shared_ptr<retro::Mesh>> renderables;
+private:
     int currentFrameIndex = 0;
     bool isInitialized{ false };
     bool vsyncEnabled{ false };
     int selectedFrameBuf = 0;
     bool gpuAvailable = false;
-
-    std::shared_ptr<Time::TimeTracker> frameTimer;
-    std::shared_ptr<Time::TimeTracker> printCheckerTimer;
-
-    // Frame management
-    FrameData frames[FRAME_OVERLAP];
-    
-    DeletionQueue rendererDeletionQueue;
-
-    std::vector<std::shared_ptr<retro::CPUMesh>> renderables;
 };

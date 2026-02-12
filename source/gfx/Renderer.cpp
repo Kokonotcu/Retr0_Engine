@@ -8,7 +8,6 @@ void  Renderer::Init(Window& window, const VulkanContext& context)
 	frameTimer = Time::RequestTracker(1.0f);
 	printCheckerTimer = Time::RequestTracker(1.0f);
 
-	// Initialize the main deletion queue with the device and allocator
 	rendererDeletionQueue.init(context.device, context.allocator);
 
 	swapchain.SetProperties(context.allocator, context.physicalDevice, context.device, window.GetVulkanSurface(), { window.GetWindowExtent().width, window.GetWindowExtent().height });
@@ -103,8 +102,8 @@ void Renderer::InitPipelines()
 	graphicsPipeline.CreateMultisampling();
 
 	// 7. Blending (No blending, Depth Less)
-	//graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS); Transparency Additive
-	//graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_COMPARE_OP_LESS); Transparency Alpha Blending
+	//graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE, VK_COMPARE_OP_LESS); //Transparency Additive
+	//graphicsPipeline.CreateBlending(VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_COMPARE_OP_LESS); //Transparency Alpha Blending
 	graphicsPipeline.CreateBlending(69, VK_COMPARE_OP_LESS);
 
 	// 8. Pipeline Layout
@@ -254,7 +253,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
 
 	// --- Camera Setup (Basic fixed camera for now) ---
-	glm::vec3 camPos = { 0.f, 0.f, -5.f };
+	glm::vec3 camPos = { 0.f, 0.f, -3.f };
 	glm::mat4 view = glm::translate(glm::mat4(1.f), camPos);
 
 	float aspect = (float)swapchain.GetExtent().width / (float)swapchain.GetExtent().height;
@@ -275,12 +274,17 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 			if (!mesh) continue;
 
 			glm::mat4 model = glm::mat4(1.f);
-			model = glm::rotate(model, glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(0, 1, 1));
+			model = glm::rotate(model, glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(-0.5f, 0, 1.0f));
 
 			// Calculate final MVP matrix
 			glm::mat4 meshMatrix = projection * view * model;
 
-			mesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), meshMatrix);
+			retro::CPUPushConstant cpuPushConstant{};
+
+			cpuPushConstant.worldMatrix = meshMatrix;
+			cpuPushConstant.model = model;
+
+			mesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), cpuPushConstant);
 			i++;
 		}
 	}
