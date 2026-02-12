@@ -1,4 +1,4 @@
-#include "gfx/vk_debug.h"
+#include "resources/vk_debug.h"
 
 #ifdef __ANDROID__
 void VK_CHECK(VkResult res)

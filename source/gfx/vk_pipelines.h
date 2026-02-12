@@ -1,6 +1,6 @@
 ﻿#pragma once 
 #include <gfx/vk_initializers.h>
-#include <gfx/vk_debug.h>
+#include <resources/vk_debug.h>
 
 #include <tools/FileManager.h>
 
@@ -84,7 +84,7 @@ public:
 
 	void CreateBlending(uint32_t colorBlendFlag, VkCompareOp depthOperation);
 
-	void CreatePipelineLayout();
+	void CreatePipelineLayout(const std::vector<VkDescriptorSetLayout>& layouts);
 
 	void CreateGraphicsPipeline(VkRenderPass renderPass);
 private:

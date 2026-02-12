@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <gfx/vk_debug.h>
+#include <resources/vk_debug.h>
 
 namespace vkinit {
 //> init_cmd

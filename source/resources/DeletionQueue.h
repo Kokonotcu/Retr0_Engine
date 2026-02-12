@@ -111,6 +111,8 @@ struct DeletionQueue {
         for (auto it = images.rbegin(); it != images.rend(); ++it)
             vmaDestroyImage(allocator, it->image, it->alloc);
         images.clear();
+
+        
     }
 
 private :

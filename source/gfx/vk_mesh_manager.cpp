@@ -3,7 +3,7 @@
 
 #include "gfx/Engine.h"
 #include "vk_initializers.h"
-#include "vk_debug.h"
+#include "resources/vk_debug.h"
 #include <glm/gtx/quaternion.hpp>
 
 #define SIMDJSON_NO_INLINE

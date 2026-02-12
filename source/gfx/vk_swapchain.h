@@ -1,6 +1,6 @@
 #pragma once
 #include <resources/vk_images.h>
-#include <gfx/vk_debug.h>
+#include <resources/vk_debug.h>
 #include <VkBootstrap.h>
 #include <resources/DeletionQueue.h>
 

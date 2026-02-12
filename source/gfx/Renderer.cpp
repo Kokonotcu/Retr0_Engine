@@ -24,6 +24,9 @@ void  Renderer::Init(Window& window, const VulkanContext& context)
 	retro::print("Renderer: Initializing Sync Structures\n");
 	InitSyncStructures();
 
+	retro::print("Renderer: Initializing Descriptors\n");
+	InitDescriptors();
+
 	isInitialized = true;
 	retro::print("Renderer: Initialized\n");
 }
@@ -107,13 +110,42 @@ void Renderer::InitPipelines()
 	graphicsPipeline.CreateBlending(69, VK_COMPARE_OP_LESS);
 
 	// 8. Pipeline Layout
-	graphicsPipeline.CreatePipelineLayout();
+	std::vector<VkDescriptorSetLayout> layouts = { bindlessLayout };
+	graphicsPipeline.CreatePipelineLayout(layouts);
 
 	// 9. Build Pipeline
 	graphicsPipeline.CreateGraphicsPipeline(swapchain.GetRenderPass());
 
 	rendererDeletionQueue.addPipeline(graphicsPipeline.GetPipeline());
 	rendererDeletionQueue.addPipelineLayout(graphicsPipeline.GetPipelineLayout());
+}
+
+void Renderer::InitDescriptors()
+{
+	// 1. Create the Global Layout (Camera Data)
+	retro::DescriptorLayoutBuilder layoutBuilder;
+	layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	bindlessLayout = layoutBuilder.build(vkContext.device, VK_SHADER_STAGE_VERTEX_BIT);
+
+	// 2. Define pool sizes (what percentage of the pool is UBOs, SSBOs, etc.)
+	std::vector<retro::DescriptorAllocator::PoolSizeRatio> poolRatios = {
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1.0f },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1.0f },
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1.0f }
+	};
+
+	// 3. Initialize the allocators for each frame
+	for (int i = 0; i < 3; i++) {
+		// maxSets: 1000 is plenty for now
+		frames[i].frameDescriptorAllocator.init_pool(vkContext.device, 1000, poolRatios);
+
+		// Add to deletion queue so they are destroyed on shutdown
+
+		rendererDeletionQueue.addPool(frames[i].frameDescriptorAllocator.get_pool());
+	}
+
+	// Add layout to deletion queue
+	rendererDeletionQueue.addSetLayout(bindlessLayout);
 }
 
 void Renderer::Resize(uint32_t width, uint32_t height)
@@ -169,7 +201,7 @@ void Renderer::Draw()
 	// Prepare command buffer
 	VkCommandBuffer cmd = frames[selectedFrameBuf].mainCommandBuffer;
 	VK_CHECK(vkResetCommandBuffer(cmd, 0));
-
+	
 	// Pass renderables to the recording function
 	RecordCommandBuffer(cmd, swapchainImageIndex);
 
@@ -230,6 +262,19 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 {
 	VkCommandBufferBeginInfo beginInfo = vkinit::command_buffer_begin_info();
 	VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+
+	// CRITICAL: Reset the pool for this frame so we can reuse memory
+	frames[selectedFrameBuf].frameDescriptorAllocator.clear_descriptors(vkContext.device);
+	// Allocate a set for the camera
+	VkDescriptorSet cameraSet = frames[selectedFrameBuf].frameDescriptorAllocator.allocate(vkContext.device, bindlessLayout);
+	// Map your buffer and write the data we do this EVERY frame for moving cameras
+	retro::DescriptorWriter writer;
+
+	//writer.write_buffer(0, _cameraBuffer.buffer, sizeof(CameraData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	writer.update_set(vkContext.device, cameraSet);
+	
+	// Inside your Command Buffer recording:
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline.GetPipelineLayout(), 0, 1, &cameraSet, 0, nullptr);
 
 	// Clear color (Deep Blue)
 	VkClearValue clearValues[2];

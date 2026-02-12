@@ -139,7 +139,10 @@ void Engine::InitVulkan()
         //vulkan 1.2 features
         VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES }; //Take a look at this later, might need to change for older devices
         features12.bufferDeviceAddress = true;
-        features12.descriptorIndexing = false;
+        features12.descriptorIndexing = VK_TRUE;
+        features12.runtimeDescriptorArray = VK_TRUE;
+        features12.descriptorBindingPartiallyBound = VK_TRUE; // Important for Bindless!
+        features12.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
 
         bufferDeviceAddress = features12.bufferDeviceAddress;
 

@@ -209,11 +209,11 @@ void GraphicsPipeline::CreateBlending(uint32_t colorBlendFlag, VkCompareOp depth
 	colorBlendStateInfo.blendConstants[3] = 0.0f; // Optional
 }
 
-void GraphicsPipeline::CreatePipelineLayout()
+void GraphicsPipeline::CreatePipelineLayout(const std::vector<VkDescriptorSetLayout>& layouts)
 {
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 0; // Optional
-	pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
+	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(layouts.size());; // Optional
+	pipelineLayoutInfo.pSetLayouts = layouts.data(); // Optional
 	pipelineLayoutInfo.pushConstantRangeCount = pushConstants.size();
 	pipelineLayoutInfo.pPushConstantRanges = pushConstants.data();
 

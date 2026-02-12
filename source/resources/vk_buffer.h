@@ -6,7 +6,7 @@
 #define VMA_VULKAN_VERSION 1002000  // target Vulkan 1.2 on Android
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
-#include "gfx/vk_debug.h"
+#include "resources/vk_debug.h"
 
 namespace retro 
 {

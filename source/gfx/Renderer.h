@@ -8,6 +8,7 @@
 
 #include <resources/DeletionQueue.h>
 #include <resources/vk_mesh.h>
+#include <resources/vk_descriptors.h>
 #include <gfx/vk_mesh_manager.h>
 
 #define GLM_FORCE_RADIANS
@@ -38,6 +39,8 @@ struct FrameData
 
 	VkSemaphore renderFinished;
 	VkFence renderFence;
+
+	retro::DescriptorAllocator frameDescriptorAllocator;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 3;
@@ -73,6 +76,7 @@ private:
     void InitCommands();
     void InitSyncStructures();
     void InitPipelines();
+	void InitDescriptors();
     
 private:
     void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex);
@@ -86,6 +90,8 @@ private:
     Swapchain swapchain;
     GraphicsPipeline graphicsPipeline; // Could be a map/manager later
     DeletionQueue rendererDeletionQueue;
+
+    VkDescriptorSetLayout bindlessLayout;
 
     // Frame management
     FrameData frames[FRAME_OVERLAP];
