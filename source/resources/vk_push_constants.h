@@ -16,6 +16,5 @@ namespace retro
     {
         glm::mat4 worldMatrix;
         glm::mat4 model;
-        glm::vec4 params; // x=Time, y=Speed, z=Intensity, w=Variation
     };
 }

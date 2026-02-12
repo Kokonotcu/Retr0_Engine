@@ -10,15 +10,11 @@
 
 #include "tools/FileManager.h"
 
-constexpr unsigned int FRAME_OVERLAP = 3;
 
 class Engine 
 {
 public:
 	Engine() = default;
-	Engine& Get() { return *this; }
-	VmaAllocator GetAllocator() { return allocator; }
-	VkDevice GetDevice() { return device; }
 
 	//initializes everything in the engine
 	void Init();
@@ -28,6 +24,12 @@ public:
 	void Run();
 
 	void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);   
+public:
+	//Getters
+	Engine& Get() { return *this; }
+	VmaAllocator GetAllocator() { return allocator; }
+	VkDevice GetDevice() { return device; }
+
 private:
 
 	void InitVulkan();
@@ -35,7 +37,6 @@ private:
 	
 	void InitCommands();
 	void InitSyncStructures();
-
 	void InitDefaultMesh();
 
 public:
@@ -62,8 +63,6 @@ public:
 	///////////////////////////////////////////////////////////////
 
 	VmaAllocator allocator;
-	//Swapchain swapchain;
-	//GraphicsPipeline graphicsPipeline;
 
 	bool bufferDeviceAddress;
 	bool isInitialized{ false };
@@ -71,7 +70,7 @@ public:
 	int selectedFrameBuf = 0;
 	bool gpuAvailable = false;
 
-	//Mesh Stuff
+	//Gpu Mesh Stuff
 	//retro::GPUMeshHandle testMesh;
 	//retro::GPUMeshHandle testMesh2;
 
@@ -79,12 +78,7 @@ public:
 	std::shared_ptr<retro::Mesh> testMesh2;
 private:
 	bool engineDebug = true;
-
 	DeletionQueue mainDeletionQueue;
-
 	Engine* loadedEngine = nullptr;
-
-public:
-	glm::vec4 params;
 };
 

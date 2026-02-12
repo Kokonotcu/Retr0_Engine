@@ -40,6 +40,8 @@ struct FrameData
 	VkFence renderFence;
 };
 
+constexpr unsigned int FRAME_OVERLAP = 3;
+
 class Renderer 
 {
 public:
@@ -52,7 +54,7 @@ public:
     void Shutdown();
 
     // The main draw command
-    void Draw(glm::vec4 params);
+    void Draw();
 
     // Handle window resizing
     void Resize(uint32_t width, uint32_t height);
@@ -68,11 +70,12 @@ public:
     }
 
 private:
-    // Internal helpers moved from Engine
     void InitCommands();
     void InitSyncStructures();
     void InitPipelines();
-    void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, glm::vec4 params);
+    
+private:
+    void RecordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex);
 
 private:
     // References to external objects (We don't own these)
@@ -82,21 +85,21 @@ private:
     // Renderer-owned resources
     Swapchain swapchain;
     GraphicsPipeline graphicsPipeline; // Could be a map/manager later
+    DeletionQueue rendererDeletionQueue;
 
-    static constexpr unsigned int FRAME_OVERLAP = 3;
+    // Frame management
+    FrameData frames[FRAME_OVERLAP];
+
+    //Timers
+    std::shared_ptr<Time::TimeTracker> frameTimer;
+    std::shared_ptr<Time::TimeTracker> printCheckerTimer;
+
+    //Actual Data
+    std::vector<std::shared_ptr<retro::Mesh>> renderables;
+private:
     int currentFrameIndex = 0;
     bool isInitialized{ false };
     bool vsyncEnabled{ false };
     int selectedFrameBuf = 0;
     bool gpuAvailable = false;
-
-    std::shared_ptr<Time::TimeTracker> frameTimer;
-    std::shared_ptr<Time::TimeTracker> printCheckerTimer;
-
-    // Frame management
-    FrameData frames[FRAME_OVERLAP];
-    
-    DeletionQueue rendererDeletionQueue;
-
-    std::vector<std::shared_ptr<retro::Mesh>> renderables;
 };

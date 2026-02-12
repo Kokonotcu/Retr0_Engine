@@ -20,6 +20,7 @@ false
 
 void Engine::Init()
 {
+    retro::print("Engine: Initializing Window\n");
 	window.Init({ "Retr0 Engine", 800, 600, true });
 
 #ifdef __ANDROID__
@@ -49,8 +50,7 @@ void Engine::Init()
     
     //everything went fine
     isInitialized = true;
-
-    retro::print("Engine: initialized\n");
+    retro::print("Engine: Initialized successfully\n");
 }
 
 bool Engine::CheckValidationLayerSupport()
@@ -253,8 +253,6 @@ void Engine::InitVulkan()
 	retro::print("\nType: ");
 	retro::print((int)props.deviceType);
 	retro::print("  (1=integrated, 2=discrete)\n");
-
-    //fmt::print("Vulkan Instance Version: {}.{}.{}\nSelected GPU: {}\nType: {}  (1=integrated, 2=discrete)\n", major, minor, patch, props.deviceName, (int)props.deviceType);
 #endif // DEBUG
 }
 
@@ -263,11 +261,11 @@ void Engine::InitCommands()
 	VkCommandPoolCreateInfo immCommandPoolInfo = vkinit::command_pool_create_info(immediateQueueIndex, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
     VK_CHECK(vkCreateCommandPool(device, &immCommandPoolInfo, nullptr, &immCommandPool));
+
 	VkCommandBufferAllocateInfo immAllocInfo = vkinit::command_buffer_allocate_info(immCommandPool, 1);
     VK_CHECK(vkAllocateCommandBuffers(device, &immAllocInfo, &immCommandBuffer));
 
     mainDeletionQueue.addCommandPool(immCommandPool);
-
 }
 
 void Engine::InitSyncStructures()
@@ -276,8 +274,8 @@ void Engine::InitSyncStructures()
     VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
 
     VK_CHECK(vkCreateFence(device, &fenceCreateInfo, nullptr, &immFence));
-	mainDeletionQueue.addFence(immFence);
 
+	mainDeletionQueue.addFence(immFence);
 }
 
 void Engine::InitDefaultMesh()
@@ -353,7 +351,7 @@ void Engine::Run()
         else
         {
 			//renderer.Draw({ testMesh, testMesh2 });
-			renderer.Draw(params);
+			renderer.Draw();
         }
     }
 }

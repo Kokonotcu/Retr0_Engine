@@ -8,7 +8,6 @@ void  Renderer::Init(Window& window, const VulkanContext& context)
 	frameTimer = Time::RequestTracker(1.0f);
 	printCheckerTimer = Time::RequestTracker(1.0f);
 
-	// Initialize the main deletion queue with the device and allocator
 	rendererDeletionQueue.init(context.device, context.allocator);
 
 	swapchain.SetProperties(context.allocator, context.physicalDevice, context.device, window.GetVulkanSurface(), { window.GetWindowExtent().width, window.GetWindowExtent().height });
@@ -84,7 +83,7 @@ void Renderer::InitPipelines()
 	// 1. Shaders
 	//graphicsPipeline.CreateVertexShaderModule<retro::GPUPushConstant>("default_vertex_BDA.vert.spv");
 	graphicsPipeline.CreateVertexShaderModule<retro::CPUPushConstant>("default_vertex.vert.spv");
-	graphicsPipeline.CreateFragmentShaderModule<retro::CPUPushConstant>("hex.frag.spv");
+	graphicsPipeline.CreateFragmentShaderModule("default_fragment.frag.spv");
 
 	// 2. Dynamic State
 	graphicsPipeline.CreateDynamicState();
@@ -123,7 +122,7 @@ void Renderer::Resize(uint32_t width, uint32_t height)
 	swapchain.Recreate({ width, height }, vsyncEnabled);
 }
 
-void Renderer::Draw(glm::vec4 params)
+void Renderer::Draw()
 {
 	// Instead of a fixed round-robin, this searches for the first available fence
 	selectedFrameBuf = 0;
@@ -172,7 +171,7 @@ void Renderer::Draw(glm::vec4 params)
 	VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
 	// Pass renderables to the recording function
-	RecordCommandBuffer(cmd, swapchainImageIndex, params);
+	RecordCommandBuffer(cmd, swapchainImageIndex);
 
 	// Submit Frame
 	VkSubmitInfo submitInfo{};
@@ -227,7 +226,7 @@ void Renderer::Draw(glm::vec4 params)
 	}
 }
 
-void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, glm::vec4 params)
+void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 {
 	VkCommandBufferBeginInfo beginInfo = vkinit::command_buffer_begin_info();
 	VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
@@ -274,7 +273,6 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 		{
 			if (!mesh) continue;
 
-
 			glm::mat4 model = glm::mat4(1.f);
 			model = glm::rotate(model, glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(-0.5f, 0, 1.0f));
 
@@ -285,10 +283,6 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
 			cpuPushConstant.worldMatrix = meshMatrix;
 			cpuPushConstant.model = model;
-
-			params = glm::vec4(rotationTimer, 1.6f, 0.05f, 1.0f);
-
-			cpuPushConstant.params = params;
 
 			mesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), cpuPushConstant);
 			i++;

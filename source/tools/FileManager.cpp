@@ -205,7 +205,7 @@ namespace FileManager
 			return {};
 		}
 
-}
+	}
 
 	namespace ShaderCompiler
 	{

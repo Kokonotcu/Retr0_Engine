@@ -17,7 +17,6 @@ layout(push_constant) uniform constants
 {
     mat4 render_matrix; // ViewProj
     mat4 model;         // Object -> World
-    vec4 params;        // x=Time, y=Speed, z=Intensity, w=Variation
 } PushConstants;
 
 void main() 
