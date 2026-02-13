@@ -18,6 +18,7 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
 
 layout(push_constant) uniform constants {
     mat4 transform;       
+	mat4 normalMatrix;
 } PushConstants;
 
 vec2 decodeUV(uint pack)    { return unpackHalf2x16(pack); }
@@ -25,6 +26,7 @@ vec4 decodeColor(uint pack) { return unpackUnorm4x8(pack); }
 
 void main() 
 {
+
     outUV = decodeUV(inUV);
     outColor = decodeColor(inColor);
 

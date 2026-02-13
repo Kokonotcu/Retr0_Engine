@@ -9,6 +9,7 @@ layout(location = 3) in vec3 inWorldPos;
 layout(location = 0) out vec4 outColor;
 
 void main() {
+
     // 1. Re-normalize inputs (Interpolation can denormalize vectors)
     vec3 N = normalize(inNormal);
 
