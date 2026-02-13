@@ -17,7 +17,7 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
 } cameraData;
 
 layout(push_constant) uniform constants {
-    mat4 model;       
+    mat4 transform;       
 } PushConstants;
 
 vec2 decodeUV(uint pack)    { return unpackHalf2x16(pack); }
@@ -28,11 +28,10 @@ void main()
     outUV = decodeUV(inUV);
     outColor = decodeColor(inColor);
 
-    vec4 worldPos = PushConstants.model * vec4(inPosition, 1.0);
+    vec4 worldPos = PushConstants.transform * vec4(inPosition, 1.0);
     outWorldPos = worldPos.xyz;
     
-    mat3 normalMat = transpose(inverse(mat3(PushConstants.model)));
-    outNormal = normalize(normalMat * inNormal); // Send to fragment shader
+    outNormal = normalize(mat3(PushConstants.normalMatrix) * inNormal);
 
     // 3. Final Position for the GPU
     gl_Position = cameraData.viewproj * worldPos;

@@ -27,5 +27,5 @@ void main() {
     vec3 finalLight = (lightColor * diff) + ambient;
 
     // Apply lighting to the vertex color
-    outColor = vec4(finalLight * inColor.rgb, inColor.a);
+    outColor = vec4(finalLight* inColor.rgb, inColor.a); //* inColor.rgb
 }

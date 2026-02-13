@@ -14,6 +14,7 @@ namespace retro
     };
     struct CPUPushConstant
     {
-        glm::mat4 model;
+        glm::mat4 transform;
+        glm::mat4 normalMatrix;
     };
 }

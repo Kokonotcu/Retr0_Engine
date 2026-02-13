@@ -330,8 +330,6 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 	// Just a simple rotation effect based on time for demonstration
 	float rotationTimer = frameTimer->GetTimePassed();
 
-	// Assume we are using the global buffers managed by MeshManager for now
-	// This matches the logic from the previous vk_engine.cpp
 	if (!renderables.empty())
 	{
 		int i = 0;
@@ -339,10 +337,13 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 		{
 			if (!mesh) continue;
 
-			glm::mat4 model = glm::rotate(glm::mat4(1.f), glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(-0.5f, 0, 1.0f));
+			glm::mat4 transform = glm::rotate(glm::mat4(1.f), glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(-0.5f, 0, 1.0f));
+			glm::mat4 normalMat = glm::transpose(glm::inverse(transform));
 
 			retro::CPUPushConstant cpuPushConstant{};
-			cpuPushConstant.model = model;
+			cpuPushConstant.transform = transform;
+			cpuPushConstant.normalMatrix = normalMat;
+
 
 			mesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), cpuPushConstant);
 			i++;
