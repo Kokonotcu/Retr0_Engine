@@ -126,6 +126,7 @@ void Renderer::InitDescriptors()
 	// 1. Create the Global Layout (Camera Data)
 	retro::DescriptorLayoutBuilder layoutBuilder;
 	layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100); // Large array for bindless textures
 	bindlessLayout = layoutBuilder.build(vkContext.device, VK_SHADER_STAGE_VERTEX_BIT);
 
 	// 2. Define pool sizes (what percentage of the pool is UBOs, SSBOs, etc.)
