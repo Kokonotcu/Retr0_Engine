@@ -31,7 +31,8 @@ void main()
     vec4 worldPos = PushConstants.model * vec4(inPosition, 1.0);
     outWorldPos = worldPos.xyz;
     
-    outNormal = normalize(mat3(PushConstants.model) * inNormal);
+    mat3 normalMat = transpose(inverse(mat3(PushConstants.model)));
+    outNormal = normalize(normalMat * inNormal); // Send to fragment shader
 
     // 3. Final Position for the GPU
     gl_Position = cameraData.viewproj * worldPos;

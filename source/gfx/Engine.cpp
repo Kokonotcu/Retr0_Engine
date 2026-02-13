@@ -283,7 +283,7 @@ void Engine::InitSyncStructures()
 
 void Engine::InitDefaultMesh()
 {
-	testMesh = MeshManager::LoadMeshCPU(FileManager::Path::GetAssetPath("basicmesh.glb"),1);
+	testMesh = MeshManager::LoadMeshCPU(FileManager::Path::GetAssetPath("smoothSphere.glb"),0);
     testMesh2 = MeshManager::LoadMeshCPU(FileManager::Path::GetAssetPath("basicmesh.glb"), 2);
 }
 
