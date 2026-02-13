@@ -14,6 +14,9 @@ void  Renderer::Init(Window& window, const VulkanContext& context)
 
 	retro::print("Renderer: Building swapchain\n");
 	swapchain.Build(vsyncEnabled);
+	
+	retro::print("Renderer: Initializing Descriptors\n");
+	InitDescriptors();
 
 	retro::print("Renderer: Initializing Pipelines\n");
 	InitPipelines();
@@ -24,8 +27,6 @@ void  Renderer::Init(Window& window, const VulkanContext& context)
 	retro::print("Renderer: Initializing Sync Structures\n");
 	InitSyncStructures();
 
-	retro::print("Renderer: Initializing Descriptors\n");
-	InitDescriptors();
 
 	isInitialized = true;
 	retro::print("Renderer: Initialized\n");
@@ -128,14 +129,16 @@ void Renderer::InitDescriptors()
 	bindlessLayout = layoutBuilder.build(vkContext.device, VK_SHADER_STAGE_VERTEX_BIT);
 
 	// 2. Define pool sizes (what percentage of the pool is UBOs, SSBOs, etc.)
-	std::vector<retro::DescriptorAllocator::PoolSizeRatio> poolRatios = {
+	std::vector<retro::DescriptorAllocator::PoolSizeRatio> poolRatios = 
+	{
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1.0f },
 		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1.0f },
 		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1.0f }
 	};
 
 	// 3. Initialize the allocators for each frame
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 3; i++) 
+	{
 		// maxSets: 1000 is plenty for now
 		frames[i].frameDescriptorAllocator.init_pool(vkContext.device, 1000, poolRatios);
 
@@ -146,6 +149,19 @@ void Renderer::InitDescriptors()
 
 	// Add layout to deletion queue
 	rendererDeletionQueue.addSetLayout(bindlessLayout);
+
+	for (int i = 0; i < FRAME_OVERLAP; i++) 
+	{
+		// Create a buffer large enough for CameraData, usable as a Uniform Buffer
+		frames[i].cameraBuffer = retro::CreateBuffer(
+			vkContext.allocator,
+			sizeof(CameraData),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+		// Add to deletion queue
+		rendererDeletionQueue.addBuffer(frames[i].cameraBuffer.buffer, frames[i].cameraBuffer.allocation);
+	}
 }
 
 void Renderer::Resize(uint32_t width, uint32_t height)
@@ -263,14 +279,28 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 	VkCommandBufferBeginInfo beginInfo = vkinit::command_buffer_begin_info();
 	VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
+	// 1. Prepare the data from Camera class
+	float aspect = (float)swapchain.GetExtent().width / (float)swapchain.GetExtent().height;
+	mainCamera.SetStats(70.f, 0.1f, 200.f, aspect);
+	glm::mat4 view = mainCamera.GetViewMatrix();
+	glm::mat4 projection = mainCamera.GetProjectionMatrix();
+	CameraData camData{};
+	camData.view = view;
+	camData.proj = projection;
+	camData.viewproj = projection * view;
+
+	// 2. Copy (Map) data to the current frame's GPU buffer
+	void* data;
+	vmaMapMemory(vkContext.allocator, frames[selectedFrameBuf].cameraBuffer.allocation, &data);
+	memcpy(data, &camData, sizeof(CameraData));
+	vmaUnmapMemory(vkContext.allocator, frames[selectedFrameBuf].cameraBuffer.allocation);
+
 	// CRITICAL: Reset the pool for this frame so we can reuse memory
 	frames[selectedFrameBuf].frameDescriptorAllocator.clear_descriptors(vkContext.device);
-	// Allocate a set for the camera
 	VkDescriptorSet cameraSet = frames[selectedFrameBuf].frameDescriptorAllocator.allocate(vkContext.device, bindlessLayout);
-	// Map your buffer and write the data we do this EVERY frame for moving cameras
-	retro::DescriptorWriter writer;
 
-	//writer.write_buffer(0, _cameraBuffer.buffer, sizeof(CameraData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	retro::DescriptorWriter writer;
+	writer.write_buffer(0, frames[selectedFrameBuf].cameraBuffer.buffer, sizeof(CameraData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 	writer.update_set(vkContext.device, cameraSet);
 	
 	// Inside your Command Buffer recording:
@@ -291,19 +321,10 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 	renderPassInfo.pClearValues = clearValues;
 
 	vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline.GetPipeline());
 
 	// Dynamic Viewport/Scissor
 	graphicsPipeline.UpdateDynamicState(commandBuffer, swapchain.GetExtent());
-
-	// --- Camera Setup (Basic fixed camera for now) ---
-	glm::vec3 camPos = { 0.f, 0.f, -3.f };
-	glm::mat4 view = glm::translate(glm::mat4(1.f), camPos);
-
-	float aspect = (float)swapchain.GetExtent().width / (float)swapchain.GetExtent().height;
-	glm::mat4 projection = glm::perspective(glm::radians(70.f), aspect, 0.1f, 200.0f);
-	projection[1][1] *= -1; // Flip Y for Vulkan
 
 	// --- Draw Objects ---
 	// Just a simple rotation effect based on time for demonstration
@@ -318,15 +339,9 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 		{
 			if (!mesh) continue;
 
-			glm::mat4 model = glm::mat4(1.f);
-			model = glm::rotate(model, glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(-0.5f, 0, 1.0f));
-
-			// Calculate final MVP matrix
-			glm::mat4 meshMatrix = projection * view * model;
+			glm::mat4 model = glm::rotate(glm::mat4(1.f), glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(-0.5f, 0, 1.0f));
 
 			retro::CPUPushConstant cpuPushConstant{};
-
-			cpuPushConstant.worldMatrix = meshMatrix;
 			cpuPushConstant.model = model;
 
 			mesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), cpuPushConstant);

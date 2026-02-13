@@ -5,18 +5,21 @@
 #include <gfx/Window.h>
 #include <gfx/vk_swapchain.h>
 #include <gfx/vk_pipelines.h>
+#include <gfx/vk_mesh_manager.h>
 
 #include <resources/DeletionQueue.h>
 #include <resources/vk_mesh.h>
 #include <resources/vk_descriptors.h>
-#include <gfx/vk_mesh_manager.h>
+
+#include <tools/Time.h>
+
+#include <core/camera.h>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <tools/Time.h>
 
 
 // A simple container for the core Vulkan handles that almost every system needs
@@ -41,6 +44,7 @@ struct FrameData
 	VkFence renderFence;
 
 	retro::DescriptorAllocator frameDescriptorAllocator;
+	retro::Buffer cameraBuffer;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 3;
@@ -72,6 +76,7 @@ public:
         renderables.erase(std::remove(renderables.begin(), renderables.end(), renderable), renderables.end());
     }
 
+	Camera& GetMainCamera() { return mainCamera; }
 private:
     void InitCommands();
     void InitSyncStructures();
@@ -91,6 +96,7 @@ private:
     GraphicsPipeline graphicsPipeline; // Could be a map/manager later
     DeletionQueue rendererDeletionQueue;
 
+	// Bindless descriptor set layout (for global resources like camera buffers, texture arrays, etc.)
     VkDescriptorSetLayout bindlessLayout;
 
     // Frame management
@@ -102,6 +108,7 @@ private:
 
     //Actual Data
     std::vector<std::shared_ptr<retro::Mesh>> renderables;
+    Camera mainCamera;
 private:
     int currentFrameIndex = 0;
     bool isInitialized{ false };

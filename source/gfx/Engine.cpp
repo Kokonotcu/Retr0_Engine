@@ -45,8 +45,8 @@ void Engine::Init()
     
 	retro::print("Engine: Initializing default mesh\n");
     InitDefaultMesh();
-	renderer.AddRenderable(testMesh2);
-	//renderer.AddRenderable(testMesh);
+	//renderer.AddRenderable(testMesh2);
+	renderer.AddRenderable(testMesh);
     
     //everything went fine
     isInitialized = true;

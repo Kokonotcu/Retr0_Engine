@@ -78,7 +78,6 @@ namespace retro
         // Take this call out of Mesh classes put them in renderComponents
         void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, glm::mat4x4 worldMatrix) override 
         {
-            cpuPushConstant.worldMatrix = worldMatrix;
 			vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &vertexOffset);
             vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::CPUPushConstant), &cpuPushConstant);
             vkCmdBindIndexBuffer(cmd, indexBuffer, indexOffset, VK_INDEX_TYPE_UINT32);
@@ -90,9 +89,9 @@ namespace retro
         }
 
         // Take this call out of Mesh classes put them in renderComponents
-        void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, CPUPushConstant worldMatrix)
+        void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, CPUPushConstant pC)
         {
-            cpuPushConstant = worldMatrix;
+            cpuPushConstant = pC;
             vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &vertexOffset);
             vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::CPUPushConstant), &cpuPushConstant);
             vkCmdBindIndexBuffer(cmd, indexBuffer, indexOffset, VK_INDEX_TYPE_UINT32);
