@@ -94,8 +94,8 @@ void Engine::InitVulkan()
     //make the vulkan instance, with basic debug features 
     auto inst_ret = builder.set_app_name("Retr0 Engine")
         .request_validation_layers(enableValidationLayers)
-        .use_default_debug_messenger()
-        .desire_api_version(1, 3, 0)
+		.use_default_debug_messenger()
+        .require_api_version(1, 3, 0).set_minimum_instance_version(1, 0, 0)
         .build();
 
 #ifdef DEBUG
@@ -113,6 +113,7 @@ void Engine::InitVulkan()
     debugMessenger = vkbInst.debug_messenger;
 
 	window.CreateVulkanSurface(instance);
+	
 
     uint32_t instanceVersion = 0;
     vkEnumerateInstanceVersion(&instanceVersion);
@@ -129,7 +130,7 @@ void Engine::InitVulkan()
     phy_ret = selector
         .set_minimum_version(1, 0)
         .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
-        .set_surface(surface)
+        .set_surface(window.GetVulkanSurface())
         .select();
     bufferDeviceAddress = false; 
 
@@ -332,6 +333,7 @@ void Engine::Cleanup()
         window.Shutdown();
     }
 }
+
 
 void Engine::Run()
 {

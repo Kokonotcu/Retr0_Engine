@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <gfx/vk_mesh_manager.h>
 #include <resources/vk_debug.h>
 #include <gfx/vk_initializers.h>
@@ -10,6 +10,7 @@
 
 #include "tools/FileManager.h"
 
+#include <thread>
 
 class Engine 
 {
