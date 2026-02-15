@@ -284,8 +284,8 @@ void Engine::InitSyncStructures()
 
 void Engine::InitDefaultMesh()
 {
-	testMesh = MeshManager::LoadMeshCPU(FileManager::Path::GetAssetPath("smoothSphere.glb"),0);
-    testMesh2 = MeshManager::LoadMeshCPU(FileManager::Path::GetAssetPath("basicmesh.glb"), 2);
+	testMesh = MeshManager::LoadMeshCPU(FileManager::Path::GetModelPath("smoothSphere.glb"),0);
+    testMesh2 = MeshManager::LoadMeshCPU(FileManager::Path::GetModelPath("basicmesh.glb"), 2);
 }
 
 void Engine::ImmediateSubmit(std::function<void(VkCommandBuffer _cmd)>&& function)

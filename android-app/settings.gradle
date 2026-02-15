@@ -11,5 +11,32 @@ dependencyResolutionManagement {
   repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
   repositories { google(); mavenCentral() }
 }
+
+import org.apache.tools.ant.taskdefs.condition.Os
+
+def findSdkDir() {
+    def sdkPath = System.getenv("ANDROID_HOME")
+    if (sdkPath) return sdkPath
+    
+    // Fallback to common locations if environment variable is missing
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        return "${System.getProperty('user.home')}\\AppData\\Local\\Android\\Sdk"
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        return "${System.getProperty('user.home')}/Library/Android/sdk"
+    }
+    return null
+}
+
+// Manually inject the property if it's not found in local.properties
+def localPropsFile = new File(settingsDir, 'local.properties')
+if (!localPropsFile.exists()) {
+    def detectedPath = findSdkDir()
+    if (detectedPath) {
+        println "No local.properties found. Injecting SDK path: $detectedPath"
+        // Use the specific property Gradle looks for
+        System.setProperty("android.home", detectedPath)
+    }
+}
+
 rootProject.name = "retr0"
 include(":app", ":nativelib")

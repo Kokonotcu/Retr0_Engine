@@ -24,9 +24,9 @@ namespace FileManager
 	std::vector<char> ReadAssetCrossPlatform(const std::string& relPath);
 	namespace Path 
 	{
-		inline fs::path GetAssetsDirectory() {return "assets/";}
-		inline fs::path GetAssetPath(std::string filename) { return GetAssetsDirectory().string() + filename; };
-		inline fs::path GetShadersDirectory() { return "shaders/"; };
+		inline fs::path GetModelsDirectory() {return "assets/models/";}
+		inline fs::path GetModelPath(std::string filename) { return GetModelsDirectory().string() + filename; };
+		inline fs::path GetShadersDirectory() { return "assets/shaders/"; };
 		inline fs::path GetShaderPath(std::string filename) { return GetShadersDirectory().string() + filename; };
 	}
 	namespace ShaderCompiler

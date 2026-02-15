@@ -117,7 +117,6 @@ target("retr0_engine")
 
         -- copy your data folders (creates out/assets and out/shaders)
         	os.trycp(path.join(os.projectdir(), "assets"),  out)
-        	os.trycp(path.join(os.projectdir(), "shaders"), out)
 			
     	end)
     end
@@ -149,7 +148,6 @@ target("retr0_engine")
         after_build(function (t)
             local out = t:targetdir()
             os.trycp(path.join(os.projectdir(), "assets"),  out)
-            os.trycp(path.join(os.projectdir(), "shaders"), out)
         end)
     end
 
@@ -218,7 +216,6 @@ target("retr0_engine")
             end
 			os.cp(path.join(sdl, "lib", sub, "SDL3.dll"), path.join(os.projectdir(),out))
 			os.cp(path.join(os.projectdir(),"assets"), path.join(os.projectdir(),out))
-			os.cp(path.join(os.projectdir(),"shaders"), path.join(os.projectdir(),out))
 		
 			-- optional shaderc from Vulkan SDK
 			local vksdk = os.getenv("VULKAN_SDK")
