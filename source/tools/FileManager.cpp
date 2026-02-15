@@ -1,5 +1,8 @@
 #include "FileManager.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 namespace FileManager 
 {
 	namespace ModelLoader 
@@ -147,36 +150,56 @@ namespace FileManager
 								});
 						}
 
-						// load vertex colors (float4 0..1 -> RGBA8 UNORM)
-						//if (auto colors = p.findAttribute("COLOR_")) {
-						//	auto& colAccessor = gltf.accessors[colors->accessorIndex];
-						//	fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, colAccessor,
-						//		[&](glm::vec4 v, size_t index) {
-						//			auto& vert = meshes.back()->vertices[initial_vtx + index];
-						//			vert.color = glm::u8vec4(
-						//				glm::clamp(int(v.r * 255.f + 0.5f), 0, 255),
-						//				glm::clamp(int(v.g * 255.f + 0.5f), 0, 255),
-						//				glm::clamp(int(v.b * 255.f + 0.5f), 0, 255),
-						//				glm::clamp(int(v.a * 255.f + 0.5f), 0, 255));
-						//		});
-						//}
+						for (int i = 0; i < meshes.back()->vertices.size(); i++)
+						{
+							meshes.back()->vertices[i].color = { 255,255,255,255 };
+						}
+
+						// load vertex colors
+						if (auto colors = p.findAttribute("COLOR_0")) { // Fixed attribute name
+							auto& colAccessor = gltf.accessors[colors->accessorIndex];
+
+							// Branch based on whether the GLTF file stores RGB or RGBA colors
+							if (colAccessor.type == fastgltf::AccessorType::Vec4) {
+								fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, colAccessor,
+									[&](glm::vec4 v, size_t index) {
+										auto& vert = meshes.back()->vertices[initial_vtx + index];
+										vert.color = glm::u8vec4(
+											glm::clamp(int(v.r * 255.f + 0.5f), 0, 255),
+											glm::clamp(int(v.g * 255.f + 0.5f), 0, 255),
+											glm::clamp(int(v.b * 255.f + 0.5f), 0, 255),
+											glm::clamp(int(v.a * 255.f + 0.5f), 0, 255));
+									});
+							}
+							else if (colAccessor.type == fastgltf::AccessorType::Vec3) {
+								fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, colAccessor,
+									[&](glm::vec3 v, size_t index) {
+										auto& vert = meshes.back()->vertices[initial_vtx + index];
+										vert.color = glm::u8vec4(
+											glm::clamp(int(v.r * 255.f + 0.5f), 0, 255),
+											glm::clamp(int(v.g * 255.f + 0.5f), 0, 255),
+											glm::clamp(int(v.b * 255.f + 0.5f), 0, 255),
+											255); // Hardcode Alpha to fully opaque
+									});
+							}
+						}
                     }
 
-                    // display the vertex normals
-                    constexpr bool OverrideColors = true;
-                    if (OverrideColors) 
-					{
-                        for (retro::Vertex& vtx : meshes.back()->vertices) 
-						{
-							glm::vec3 n01 = vtx.normal * 0.5f;
-							vtx.color = glm::u8vec4(
-								(uint8_t)glm::clamp(int(n01.r * 255.0f + 0.5f), 0, 255),
-								(uint8_t)glm::clamp(int(n01.g * 255.0f + 0.5f), 0, 255),
-								(uint8_t)glm::clamp(int(n01.b * 255.0f + 0.5f), 0, 255),
-								255
-							);
-                        }
-                    }
+                    //// display the vertex normals
+                    //constexpr bool OverrideColors = false;
+                    //if (OverrideColors) 
+					//{
+                    //    for (retro::Vertex& vtx : meshes.back()->vertices) 
+					//	{
+					//		glm::vec3 n01 = vtx.normal * 0.5f;
+					//		vtx.color = glm::u8vec4(
+					//			(uint8_t)glm::clamp(int(n01.r * 255.0f + 0.5f), 0, 255),
+					//			(uint8_t)glm::clamp(int(n01.g * 255.0f + 0.5f), 0, 255),
+					//			(uint8_t)glm::clamp(int(n01.b * 255.0f + 0.5f), 0, 255),
+					//			255
+					//		);
+                    //    }
+                    //}
                 }
 
                 return meshes;
@@ -409,5 +432,186 @@ namespace FileManager
 		f.read(out.data(), sz);
 		return out;
 #endif
+	}
+
+	namespace TextureLoader
+	{
+		bool LoadTexture(std::string filePath, retro::Texture& outTexture,
+			VkDevice device, VmaAllocator allocator,
+			VkQueue copyQueue, VkCommandPool commandPool) 
+		{
+			// 1. Load Image from Disk (CPU)
+			int texWidth, texHeight, texChannels;
+
+			// Force 4 channels (RGBA) for consistency
+			stbi_uc* pixels = stbi_load(filePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+
+			if (!pixels) 
+			{
+				retro::print("Failed to load texture file: " + filePath + "\n");
+				return false;
+			}
+
+			VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+			// 2. Create Staging Buffer (Upload Buffer)
+			VkBufferCreateInfo bufferInfo = {};
+			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			bufferInfo.size = imageSize;
+			bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+			VmaAllocationCreateInfo vmaAllocInfo = {};
+			vmaAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+
+			VkBuffer stagingBuffer;
+			VmaAllocation stagingAllocation;
+			vmaCreateBuffer(allocator, &bufferInfo, &vmaAllocInfo, &stagingBuffer, &stagingAllocation, nullptr);
+
+			// 3. Copy Pixel Data to Staging Buffer
+			void* data;
+			vmaMapMemory(allocator, stagingAllocation, &data);
+			memcpy(data, pixels, static_cast<size_t>(imageSize));
+			vmaUnmapMemory(allocator, stagingAllocation);
+
+			stbi_image_free(pixels); // Free CPU copy
+
+			// 4. Create GPU Image
+			retro::Image& newImage = outTexture.image;
+			newImage.imageExtent = { (uint32_t)texWidth, (uint32_t)texHeight, 1 };
+			newImage.imageFormat = VK_FORMAT_R8G8B8A8_SRGB; // Standard texture format
+
+			VkImageCreateInfo imageInfo = {};
+			imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+			imageInfo.imageType = VK_IMAGE_TYPE_2D;
+			imageInfo.extent = newImage.imageExtent;
+			imageInfo.mipLevels = 1;
+			imageInfo.arrayLayers = 1;
+			imageInfo.format = newImage.imageFormat;
+			imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+			imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+			imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+			imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+			VmaAllocationCreateInfo imgAllocInfo = {};
+			imgAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+			vmaCreateImage(allocator, &imageInfo, &imgAllocInfo, &newImage.image, &newImage.allocation, nullptr);
+
+			// 5. Execute Command to Copy Buffer -> Image
+			// We manually allocate a temporary command buffer here to avoid dependency on Engine helper functions
+			VkCommandBufferAllocateInfo allocInfo = {};
+			allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			allocInfo.commandPool = commandPool;
+			allocInfo.commandBufferCount = 1;
+
+			VkCommandBuffer cmd;
+			vkAllocateCommandBuffers(device, &allocInfo, &cmd);
+
+			VkCommandBufferBeginInfo beginInfo = {};
+			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+			vkBeginCommandBuffer(cmd, &beginInfo);
+
+			// Transition: Undefined -> Transfer DST
+			VkImageMemoryBarrier barrierToTransfer = {};
+			barrierToTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			barrierToTransfer.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			barrierToTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			barrierToTransfer.srcAccessMask = 0;
+			barrierToTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			barrierToTransfer.image = newImage.image;
+			barrierToTransfer.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrierToTransfer.subresourceRange.baseMipLevel = 0;
+			barrierToTransfer.subresourceRange.levelCount = 1;
+			barrierToTransfer.subresourceRange.baseArrayLayer = 0;
+			barrierToTransfer.subresourceRange.layerCount = 1;
+
+			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrierToTransfer);
+
+			// Copy
+			VkBufferImageCopy copyRegion = {};
+			copyRegion.bufferOffset = 0;
+			copyRegion.bufferRowLength = 0;
+			copyRegion.bufferImageHeight = 0;
+			copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copyRegion.imageSubresource.mipLevel = 0;
+			copyRegion.imageSubresource.baseArrayLayer = 0;
+			copyRegion.imageSubresource.layerCount = 1;
+			copyRegion.imageExtent = newImage.imageExtent;
+
+			vkCmdCopyBufferToImage(cmd, stagingBuffer, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
+
+			// Transition: Transfer DST -> Shader Read Only
+			VkImageMemoryBarrier barrierToShader = barrierToTransfer;
+			barrierToShader.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			barrierToShader.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barrierToShader.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			barrierToShader.dstAccessMask = 0;
+
+			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrierToShader);
+
+			vkEndCommandBuffer(cmd);
+
+			// Submit and Wait
+			VkSubmitInfo submitInfo = {};
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.commandBufferCount = 1;
+			submitInfo.pCommandBuffers = &cmd;
+
+			vkQueueSubmit(copyQueue, 1, &submitInfo, VK_NULL_HANDLE);
+			vkQueueWaitIdle(copyQueue); // Block until upload is done
+
+			// Cleanup temporary resources
+			vkFreeCommandBuffers(device, commandPool, 1, &cmd);
+			vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+
+			// 6. Create ImageView
+			VkImageViewCreateInfo viewInfo = {};
+			viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			viewInfo.image = newImage.image;
+			viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			viewInfo.format = newImage.imageFormat;
+			viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			viewInfo.subresourceRange.baseMipLevel = 0;
+			viewInfo.subresourceRange.levelCount = 1;
+			viewInfo.subresourceRange.baseArrayLayer = 0;
+			viewInfo.subresourceRange.layerCount = 1;
+
+			if (vkCreateImageView(device, &viewInfo, nullptr, &newImage.imageView) != VK_SUCCESS) {
+				retro::print("Failed to create texture image view!\n");
+				return false;
+			}
+
+			// 7. Create Sampler
+			VkSamplerCreateInfo samplerInfo = {};
+			samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			samplerInfo.magFilter = VK_FILTER_NEAREST; // Retro style
+			samplerInfo.minFilter = VK_FILTER_NEAREST;
+			samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+			// Note: Ideally you query physical device properties for maxAnisotropy, but 16.0f is standard for modern GPUs
+			samplerInfo.anisotropyEnable = VK_FALSE;
+			samplerInfo.maxAnisotropy = 1.0f;
+
+			samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+			samplerInfo.unnormalizedCoordinates = VK_FALSE;
+			samplerInfo.compareEnable = VK_FALSE;
+			samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+			samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+			if (vkCreateSampler(device, &samplerInfo, nullptr, &outTexture.sampler) != VK_SUCCESS) 
+			{
+				retro::print("Failed to create texture sampler!\n");
+				return false;
+			}
+
+			retro::print("Texture loaded successfully: " + filePath + "\n");
+			return true;
+		}
 	}
 }

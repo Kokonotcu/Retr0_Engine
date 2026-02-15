@@ -11,6 +11,8 @@
 #include <resources/vk_mesh.h>
 #include <resources/vk_descriptors.h>
 
+#include <components/Renderable.h>
+
 #include <tools/Time.h>
 
 #include <core/camera.h>
@@ -66,15 +68,17 @@ public:
     // Handle window resizing
     void Resize(uint32_t width, uint32_t height);
 
-    void AddRenderable(const std::shared_ptr<retro::Mesh>& renderable) 
+    void AddRenderable(const retro::Renderable& renderable)
     {
         renderables.push_back(renderable);
 	}
 
-    void RemoveRenderable(const std::shared_ptr<retro::Mesh>& renderable)
+    void RemoveRenderable(const retro::Renderable& renderable)
     {
         renderables.erase(std::remove(renderables.begin(), renderables.end(), renderable), renderables.end());
     }
+
+    std::shared_ptr<retro::Material> CreateMaterial(std::shared_ptr<retro::Texture> texture);
 
 	Camera& GetMainCamera() { return mainCamera; }
 private:
@@ -98,6 +102,8 @@ private:
 
 	// Bindless descriptor set layout (for global resources like camera buffers, texture arrays, etc.)
     VkDescriptorSetLayout bindlessLayout;
+    VkDescriptorSetLayout materialLayout;
+    retro::DescriptorAllocator globalDescriptorAllocator;
 
     // Frame management
     FrameData frames[FRAME_OVERLAP];
@@ -107,7 +113,7 @@ private:
     std::shared_ptr<Time::TimeTracker> printCheckerTimer;
 
     //Actual Data
-    std::vector<std::shared_ptr<retro::Mesh>> renderables;
+    std::vector<retro::Renderable> renderables;
     Camera mainCamera;
 private:
     int currentFrameIndex = 0;

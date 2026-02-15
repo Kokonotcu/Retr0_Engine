@@ -13,10 +13,10 @@ namespace retro
 {
     struct Vertex
     {
-        glm::vec3 position;
-        glm::u16vec2 uv;
-        glm::vec3 normal;
-        glm::u8vec4 color;
+        glm::vec3 position{ 0.0f };
+        glm::u16vec2 uv{ 0 };
+        glm::vec3 normal{ 0.0f };
+        glm::u8vec4 color{ 255, 255, 255, 255 };
     };
     static_assert(sizeof(Vertex) == 32);
 
@@ -31,7 +31,7 @@ namespace retro
         virtual void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, glm::mat4x4 worldMatrix) = 0;
     };
 
-	struct MeshBase : public Drawable
+	struct MeshBase
     {
         // where this mesh lives inside the mega buffers:
         VkDeviceSize vertexOffset = 0; // bytes
@@ -42,22 +42,23 @@ namespace retro
         std::vector<Submesh> submeshes;
     };
 
+    //!Depracated!
     struct GPUMeshHandle : public MeshBase
     {
         VkDeviceAddress vertexBufferAddress;
 		retro::GPUPushConstant gpuPushConstant;
 
-        void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, glm::mat4x4 worldMatrix) override
-        {
-			gpuPushConstant.worldMatrix = worldMatrix;
-			gpuPushConstant.vertexBuffer = vertexBufferAddress;
-            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::GPUPushConstant), &gpuPushConstant);
-            vkCmdBindIndexBuffer(cmd, indexBuffer, indexOffset, VK_INDEX_TYPE_UINT32);
-            
-            for (const auto& submesh : submeshes) {
-                vkCmdDrawIndexed(cmd, submesh.count, 1, submesh.startIndex, 0, 0);
-			}
-		}
+        //void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, glm::mat4x4 worldMatrix) override
+        //{
+		//	gpuPushConstant.worldMatrix = worldMatrix;
+		//	gpuPushConstant.vertexBuffer = vertexBufferAddress;
+        //    vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::GPUPushConstant), &gpuPushConstant);
+        //    vkCmdBindIndexBuffer(cmd, indexBuffer, indexOffset, VK_INDEX_TYPE_UINT32);
+        //    
+        //    for (const auto& submesh : submeshes) {
+        //        vkCmdDrawIndexed(cmd, submesh.count, 1, submesh.startIndex, 0, 0);
+		//	}
+		//}
     };
 
     struct Mesh : public MeshBase 
@@ -74,32 +75,5 @@ namespace retro
             submeshes.clear();
             name = "";
 		}
-
-        // Take this call out of Mesh classes put them in renderComponents
-        void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, glm::mat4x4 worldMatrix) override 
-        {
-			vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &vertexOffset);
-            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::CPUPushConstant), &cpuPushConstant);
-            vkCmdBindIndexBuffer(cmd, indexBuffer, indexOffset, VK_INDEX_TYPE_UINT32);
-
-            for (const auto& submesh : submeshes) 
-            {
-                vkCmdDrawIndexed(cmd, submesh.count, 1, submesh.startIndex, 0, 0);
-            }
-        }
-
-        // Take this call out of Mesh classes put them in renderComponents
-        void Draw(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout, VkBuffer indexBuffer, VkBuffer vertexBuffer, CPUPushConstant pC)
-        {
-            cpuPushConstant = pC;
-            vkCmdBindVertexBuffers(cmd, 0, 1, &vertexBuffer, &vertexOffset);
-            vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(retro::CPUPushConstant), &cpuPushConstant);
-            vkCmdBindIndexBuffer(cmd, indexBuffer, indexOffset, VK_INDEX_TYPE_UINT32);
-
-            for (const auto& submesh : submeshes)
-            {
-                vkCmdDrawIndexed(cmd, submesh.count, 1, submesh.startIndex, 0, 0);
-            }
-        }
     };
 }

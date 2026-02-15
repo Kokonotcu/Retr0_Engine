@@ -75,8 +75,8 @@ public:
 	//retro::GPUMeshHandle testMesh;
 	//retro::GPUMeshHandle testMesh2;
 
-	std::shared_ptr<retro::Mesh> testMesh;
-	std::shared_ptr<retro::Mesh> testMesh2;
+	retro::Renderable testMesh;
+	retro::Renderable testMesh2;
 private:
 	bool engineDebug = true;
 	DeletionQueue mainDeletionQueue;

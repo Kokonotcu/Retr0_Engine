@@ -284,8 +284,22 @@ void Engine::InitSyncStructures()
 
 void Engine::InitDefaultMesh()
 {
-	testMesh = MeshManager::LoadMeshCPU(FileManager::Path::GetModelPath("smoothSphere.glb"),0);
-    testMesh2 = MeshManager::LoadMeshCPU(FileManager::Path::GetModelPath("basicmesh.glb"), 2);
+	testMesh.mesh = MeshManager::LoadMeshCPU(FileManager::Path::GetModelPath("smoothSphere.glb"),0);
+
+	std::shared_ptr<retro::Texture> outTexture;
+	outTexture = std::make_shared<retro::Texture>();
+    FileManager::TextureLoader::LoadTexture(FileManager::Path::GetTexturePath("earth.jpg").string(), *outTexture, device, allocator, immediateQueue, immCommandPool);
+
+	testMesh.material = renderer.CreateMaterial(outTexture);
+
+	mainDeletionQueue.addSampler(outTexture->sampler);
+	mainDeletionQueue.addImageView(outTexture->image.imageView);
+	mainDeletionQueue.addImage(outTexture->image.image, outTexture->image.allocation);
+
+
+
+
+    testMesh2.mesh = MeshManager::LoadMeshCPU(FileManager::Path::GetModelPath("basicmesh.glb"), 2);
 }
 
 void Engine::ImmediateSubmit(std::function<void(VkCommandBuffer _cmd)>&& function)

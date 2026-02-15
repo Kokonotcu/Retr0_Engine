@@ -45,6 +45,23 @@ void Renderer::Shutdown()
 	}
 }
 
+std::shared_ptr<retro::Material> Renderer::CreateMaterial(std::shared_ptr<retro::Texture> texture)
+{
+	auto material = std::make_shared<retro::Material>();
+	material->albedoTexture = texture;
+
+	// Allocate a new descriptor set for this material
+	// (Note: ensure 'globalDescriptorAllocator' matches the exact name of your allocator variable)
+	material->materialSet = globalDescriptorAllocator.allocate(vkContext.device, materialLayout);
+
+	// Write the texture data into the descriptor set
+	retro::DescriptorWriter writer;
+	writer.write_image(0, texture->image.imageView, texture->sampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	writer.update_set(vkContext.device, material->materialSet);
+
+	return material;
+}
+
 void Renderer::InitCommands()
 {
 	// Create a command pool for commands submitted to the graphics queue.
@@ -111,7 +128,7 @@ void Renderer::InitPipelines()
 	graphicsPipeline.CreateBlending(69, VK_COMPARE_OP_LESS);
 
 	// 8. Pipeline Layout
-	std::vector<VkDescriptorSetLayout> layouts = { bindlessLayout };
+	std::vector<VkDescriptorSetLayout> layouts = { bindlessLayout, materialLayout};
 	graphicsPipeline.CreatePipelineLayout(layouts);
 
 	// 9. Build Pipeline
@@ -123,35 +140,44 @@ void Renderer::InitPipelines()
 
 void Renderer::InitDescriptors()
 {
-	// 1. Create the Global Layout (Camera Data)
+	// 1. Create the Global Layout (Camera Data) -> SET 0
 	retro::DescriptorLayoutBuilder layoutBuilder;
 	layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-	layoutBuilder.add_binding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100); // Large array for bindless textures
 	bindlessLayout = layoutBuilder.build(vkContext.device, VK_SHADER_STAGE_VERTEX_BIT);
 
-	// 2. Define pool sizes (what percentage of the pool is UBOs, SSBOs, etc.)
-	std::vector<retro::DescriptorAllocator::PoolSizeRatio> poolRatios = 
+	// 2. Create the Material Layout (Textures) -> SET 1
+	layoutBuilder.clear(); // <--- CRITICAL: Clear before building the next layout!
+	layoutBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	materialLayout = layoutBuilder.build(vkContext.device, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+	// 3. Define pool sizes for per-frame dynamic descriptors (UBOs)
+	std::vector<retro::DescriptorAllocator::PoolSizeRatio> framePoolRatios =
 	{
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1.0f },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1.0f },
-		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1.0f }
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1.0f }
 	};
 
-	// 3. Initialize the allocators for each frame
-	for (int i = 0; i < 3; i++) 
+	// Initialize the allocators for each frame
+	for (int i = 0; i < 3; i++)
 	{
-		// maxSets: 1000 is plenty for now
-		frames[i].frameDescriptorAllocator.init_pool(vkContext.device, 1000, poolRatios);
-
-		// Add to deletion queue so they are destroyed on shutdown
-
+		frames[i].frameDescriptorAllocator.init_pool(vkContext.device, 1000, framePoolRatios);
 		rendererDeletionQueue.addPool(frames[i].frameDescriptorAllocator.get_pool());
 	}
 
-	// Add layout to deletion queue
-	rendererDeletionQueue.addSetLayout(bindlessLayout);
+	// 4. Initialize the GLOBAL allocator for persistent descriptors (Textures)
+	std::vector<retro::DescriptorAllocator::PoolSizeRatio> globalPoolRatios =
+	{
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1.0f }
+	};
+	// maxSets: 100 is plenty for 100 different materials
+	globalDescriptorAllocator.init_pool(vkContext.device, 100, globalPoolRatios);
+	rendererDeletionQueue.addPool(globalDescriptorAllocator.get_pool());
 
-	for (int i = 0; i < FRAME_OVERLAP; i++) 
+	// Add layouts to deletion queue
+	rendererDeletionQueue.addSetLayout(bindlessLayout);
+	rendererDeletionQueue.addSetLayout(materialLayout); // Don't forget to queue this one too!
+
+	for (int i = 0; i < FRAME_OVERLAP; i++)
 	{
 		// Create a buffer large enough for CameraData, usable as a Uniform Buffer
 		frames[i].cameraBuffer = retro::CreateBuffer(
@@ -309,7 +335,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 
 	// Clear color (Deep Blue)
 	VkClearValue clearValues[2];
-	clearValues[0].color = { {0.0f, 0.0f, 0.32f, 1.0f} };
+	clearValues[0].color = { {0.001f, 0.001f, 0.001f, 1.0f} };
 	clearValues[1].depthStencil = { 1.0f, 0 };
 
 	VkRenderPassBeginInfo renderPassInfo{};
@@ -334,19 +360,24 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 	if (!renderables.empty())
 	{
 		int i = 0;
-		for (const auto& mesh : renderables)
+		for (auto& renderable : renderables)
 		{
-			if (!mesh) continue;
+			if (!renderable.IsValid()) continue;
+
+			// NEW: Bind Set 1 (The texture/material)
+			// We assume the materialSet has already been allocated and written to before getting here
+			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline.GetPipelineLayout(), 1, 1, &renderable.material->materialSet, 0, nullptr);
 
 			glm::mat4 transform = glm::rotate(glm::mat4(1.f), glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(-0.5f, 0, 1.0f));
 			glm::mat4 normalMat = glm::transpose(glm::inverse(transform));
+
 
 			retro::CPUPushConstant cpuPushConstant{};
 			cpuPushConstant.transform = transform;
 			cpuPushConstant.normalMatrix = normalMat;
 
 
-			mesh->Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), cpuPushConstant);
+			renderable.Draw(commandBuffer, graphicsPipeline.GetPipelineLayout(), MeshManager::GetGlobalIndexBuffer(), MeshManager::GetGlobalVertexBuffer(), cpuPushConstant);
 			i++;
 		}
 	}

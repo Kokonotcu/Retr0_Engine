@@ -8,6 +8,8 @@ layout(location = 3) in vec3 inWorldPos;
 
 layout(location = 0) out vec4 outColor;
 
+layout(set = 1, binding = 0) uniform sampler2D albedoTex;
+
 void main() {
 
     // 1. Re-normalize inputs (Interpolation can denormalize vectors)
@@ -24,9 +26,12 @@ void main() {
     vec3 ambient = vec3(0.01, 0.01, 0.01);
 
     // 5. Combine results
-    vec3 lightColor = vec3(1.0, 1.0, 1.0);
+    vec3 lightColor = vec3(2.0, 2.0, 2.0);
     vec3 finalLight = (lightColor * diff) + ambient;
 
-    // Apply lighting to the vertex color
-    outColor = vec4(finalLight* inColor.rgb, inColor.a); //* inColor.rgb
+    // NEW: Sample the texture using the UV coordinates
+    vec4 texColor = texture(albedoTex, inUV);
+
+    // Apply lighting, vertex color, and texture color together
+    outColor = vec4(finalLight * inColor.rgb * texColor.rgb, inColor.a * texColor.a);
 }
