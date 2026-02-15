@@ -33,5 +33,5 @@ void main() {
     vec4 texColor = texture(albedoTex, inUV);
 
     // Apply lighting, vertex color, and texture color together
-    outColor = vec4(finalLight * inColor.rgb * texColor.rgb, inColor.a * texColor.a);
+    outColor = vec4(finalLight * texColor.rgb, texColor.a );
 }

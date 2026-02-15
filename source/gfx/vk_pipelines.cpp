@@ -96,7 +96,7 @@ void GraphicsPipeline::CreateClassicVertexInput()
 
 	attributeDescriptions[1].binding = 0;
 	attributeDescriptions[1].location = 1;
-	attributeDescriptions[1].format = VK_FORMAT_R32_UINT;
+	attributeDescriptions[1].format = VK_FORMAT_R16G16_SFLOAT;
 	attributeDescriptions[1].offset = offsetof(retro::Vertex, uv);
 
 	attributeDescriptions[2].binding = 0;
@@ -106,7 +106,7 @@ void GraphicsPipeline::CreateClassicVertexInput()
 
 	attributeDescriptions[3].binding = 0;
 	attributeDescriptions[3].location = 3;
-	attributeDescriptions[3].format = VK_FORMAT_R32_UINT;
+	attributeDescriptions[3].format = VK_FORMAT_R8G8B8A8_UNORM;
 	attributeDescriptions[3].offset = offsetof(retro::Vertex, color);
 
 

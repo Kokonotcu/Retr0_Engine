@@ -150,15 +150,10 @@ namespace FileManager
 								});
 						}
 
-						for (int i = 0; i < meshes.back()->vertices.size(); i++)
-						{
-							meshes.back()->vertices[i].color = { 255,255,255,255 };
-						}
-
 						// load vertex colors
 						if (auto colors = p.findAttribute("COLOR_0")) { // Fixed attribute name
 							auto& colAccessor = gltf.accessors[colors->accessorIndex];
-
+						
 							// Branch based on whether the GLTF file stores RGB or RGBA colors
 							if (colAccessor.type == fastgltf::AccessorType::Vec4) {
 								fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, colAccessor,
