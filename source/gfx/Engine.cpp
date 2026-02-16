@@ -125,6 +125,8 @@ void Engine::InitVulkan()
     vkb::PhysicalDeviceSelector selector{ vkbInst };
 
     vkb::Result<vkb::PhysicalDevice>  phy_ret{ std::error_code()};
+    VkPhysicalDeviceFeatures features{};
+    features.samplerAnisotropy = VK_TRUE;
     
 #ifdef __ANDROID__
     phy_ret = selector
@@ -150,6 +152,7 @@ void Engine::InitVulkan()
         phy_ret = selector
             .set_minimum_version(1, 2)
             .set_required_features_12(features12)
+			.set_required_features(features) //vulkan 1.0 features
             .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
             .set_surface(window.GetVulkanSurface())
             .select();
@@ -160,6 +163,7 @@ void Engine::InitVulkan()
 
         phy_ret = selector
             .set_minimum_version(1, 0)
+            .set_required_features(features) //vulkan 1.0 features
             .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
             .set_surface(window.GetVulkanSurface())
             .select();
@@ -198,10 +202,10 @@ void Engine::InitVulkan()
     chosenGPU = physicalDevice.physical_device;
 
 	auto gq_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
-	auto iq_ret = vkbDevice.get_queue(vkb::QueueType::transfer);
+	auto iq_ret = vkbDevice.get_queue(vkb::QueueType::graphics);
 
     auto gqi_ret = vkbDevice.get_queue_index(vkb::QueueType::graphics);
-	auto iqi_ret = vkbDevice.get_queue_index(vkb::QueueType::transfer);
+	auto iqi_ret = vkbDevice.get_queue_index(vkb::QueueType::graphics);
 #ifdef DEBUG
     if (!gq_ret)
     {

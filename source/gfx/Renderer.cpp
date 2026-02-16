@@ -356,7 +356,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 	// --- Draw Objects ---
 	// Just a simple rotation effect based on time for demonstration
 	float rotationTimer = frameTimer->GetTimePassed();
-
+	rotationTimer = (rotationTimer * 1020.f) * 0.0002777778 + 240.f;
 	if (!renderables.empty())
 	{
 		int i = 0;
@@ -368,7 +368,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 			// We assume the materialSet has already been allocated and written to before getting here
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline.GetPipelineLayout(), 1, 1, &renderable.material->materialSet, 0, nullptr);
 
-			glm::mat4 transform = glm::rotate(glm::mat4(1.f), glm::radians(rotationTimer * 40.f * (i + 1)), glm::vec3(0.0f, 1.0f, 0.0f));
+			glm::mat4 transform = glm::rotate(glm::mat4(1.f), glm::radians(rotationTimer * (i + 1)), glm::vec3(0.0f, 1.0f, 0.0f));
 			glm::mat4 normalMat = glm::transpose(glm::inverse(transform));
 
 

@@ -15,7 +15,7 @@ struct CameraData
 class Camera 
 {
 public:
-    glm::vec3 position{ 0.f, 0.f, -3.f };
+    glm::vec3 position{ 0.f, 0.f, -2.f };
 	glm::vec3 rotation{ 0.f, 0.f, 0.f };
 
     glm::mat4 GetViewMatrix() const;

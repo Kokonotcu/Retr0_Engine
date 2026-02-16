@@ -46,6 +46,6 @@ namespace FileManager
 	{
 		bool LoadTexture(std::string filePath, retro::Texture& outTexture,
 			VkDevice device, VmaAllocator allocator,
-			VkQueue copyQueue, VkCommandPool commandPool);
+			VkQueue copyQueue, VkCommandPool commandPool, bool bilinearFilter = true);
 	}
 }

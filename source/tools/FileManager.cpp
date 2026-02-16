@@ -433,7 +433,7 @@ namespace FileManager
 	{
 		bool LoadTexture(std::string filePath, retro::Texture& outTexture,
 			VkDevice device, VmaAllocator allocator,
-			VkQueue copyQueue, VkCommandPool commandPool) 
+			VkQueue copyQueue, VkCommandPool commandPool, bool bilinearFilter) 
 		{
 			// 1. Load Image from Disk (CPU)
 			int texWidth, texHeight, texChannels;
@@ -448,6 +448,7 @@ namespace FileManager
 			}
 
 			VkDeviceSize imageSize = texWidth * texHeight * 4;
+			uint32_t mipLevels = static_cast<uint32_t>(std::max((int)(std::floor(std::log2(std::max(texWidth, texHeight)))/5.0f), 1));
 
 			// 2. Create Staging Buffer (Upload Buffer)
 			VkBufferCreateInfo bufferInfo = {};
@@ -479,12 +480,12 @@ namespace FileManager
 			imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 			imageInfo.imageType = VK_IMAGE_TYPE_2D;
 			imageInfo.extent = newImage.imageExtent;
-			imageInfo.mipLevels = 1;
+			imageInfo.mipLevels = mipLevels;
 			imageInfo.arrayLayers = 1;
 			imageInfo.format = newImage.imageFormat;
 			imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 			imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+			imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 			imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 			imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -520,7 +521,7 @@ namespace FileManager
 			barrierToTransfer.image = newImage.image;
 			barrierToTransfer.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			barrierToTransfer.subresourceRange.baseMipLevel = 0;
-			barrierToTransfer.subresourceRange.levelCount = 1;
+			barrierToTransfer.subresourceRange.levelCount = mipLevels;
 			barrierToTransfer.subresourceRange.baseArrayLayer = 0;
 			barrierToTransfer.subresourceRange.layerCount = 1;
 
@@ -539,14 +540,73 @@ namespace FileManager
 
 			vkCmdCopyBufferToImage(cmd, stagingBuffer, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-			// Transition: Transfer DST -> Shader Read Only
-			VkImageMemoryBarrier barrierToShader = barrierToTransfer;
-			barrierToShader.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-			barrierToShader.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			barrierToShader.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-			barrierToShader.dstAccessMask = 0;
+			// Generate the rest of the mipmaps
+			int32_t mipWidth = texWidth;
+			int32_t mipHeight = texHeight;
 
-			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrierToShader);
+			for (uint32_t i = 1; i < mipLevels; i++) {
+				VkImageMemoryBarrier barrier = {};
+				barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				barrier.image = newImage.image;
+				barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				barrier.subresourceRange.baseArrayLayer = 0;
+				barrier.subresourceRange.layerCount = 1;
+				barrier.subresourceRange.levelCount = 1;
+				barrier.subresourceRange.baseMipLevel = i - 1;
+
+				// Transition previous mip level to SRC so we can read from it
+				barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+				barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+				barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+				barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+				vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+				VkImageBlit blit = {};
+				blit.srcOffsets[0] = { 0, 0, 0 };
+				blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+				blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				blit.srcSubresource.mipLevel = i - 1;
+				blit.srcSubresource.baseArrayLayer = 0;
+				blit.srcSubresource.layerCount = 1;
+				blit.dstOffsets[0] = { 0, 0, 0 };
+				blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+				blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				blit.dstSubresource.mipLevel = i;
+				blit.dstSubresource.baseArrayLayer = 0;
+				blit.dstSubresource.layerCount = 1;
+
+				vkCmdBlitImage(cmd, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, newImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+				// Transition previous mip level to SHADER_READ since we are done with it
+				barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+				barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+				barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+				vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+				if (mipWidth > 1) mipWidth /= 2;
+				if (mipHeight > 1) mipHeight /= 2;
+			}
+
+			// Transition the final generated mip level to SHADER_READ
+			VkImageMemoryBarrier finalBarrier = {};
+			finalBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			finalBarrier.image = newImage.image;
+			finalBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			finalBarrier.subresourceRange.baseArrayLayer = 0;
+			finalBarrier.subresourceRange.layerCount = 1;
+			finalBarrier.subresourceRange.levelCount = 1;
+			finalBarrier.subresourceRange.baseMipLevel = mipLevels - 1;
+			finalBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			finalBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			finalBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			finalBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &finalBarrier);
 
 			vkEndCommandBuffer(cmd);
 
@@ -571,7 +631,7 @@ namespace FileManager
 			viewInfo.format = newImage.imageFormat;
 			viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			viewInfo.subresourceRange.baseMipLevel = 0;
-			viewInfo.subresourceRange.levelCount = 1;
+			viewInfo.subresourceRange.levelCount = mipLevels;
 			viewInfo.subresourceRange.baseArrayLayer = 0;
 			viewInfo.subresourceRange.layerCount = 1;
 
@@ -580,24 +640,38 @@ namespace FileManager
 				return false;
 			}
 
-			// 7. Create Sampler
+			// 7. Create The "Golden Setup" Sampler
 			VkSamplerCreateInfo samplerInfo = {};
 			samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-			samplerInfo.magFilter = VK_FILTER_NEAREST; // Retro style
-			samplerInfo.minFilter = VK_FILTER_NEAREST;
+
+			if (bilinearFilter)
+			{
+				samplerInfo.magFilter = VK_FILTER_LINEAR;
+				samplerInfo.minFilter = VK_FILTER_LINEAR;
+			}
+			else
+			{
+				samplerInfo.magFilter = VK_FILTER_NEAREST;
+				samplerInfo.minFilter = VK_FILTER_NEAREST;
+			}
+
 			samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 			samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 			samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
-			// Note: Ideally you query physical device properties for maxAnisotropy, but 16.0f is standard for modern GPUs
-			samplerInfo.anisotropyEnable = VK_FALSE;
-			samplerInfo.maxAnisotropy = 1.0f;
+			samplerInfo.anisotropyEnable = VK_TRUE;
+			samplerInfo.maxAnisotropy = 16.0f;
 
 			samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 			samplerInfo.unnormalizedCoordinates = VK_FALSE;
 			samplerInfo.compareEnable = VK_FALSE;
 			samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+
+			// Smoothly transition between mip levels based on distance
 			samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+			samplerInfo.minLod = 0.0f;
+			samplerInfo.maxLod = static_cast<float>(mipLevels);
+			samplerInfo.mipLodBias = 0.0f;
 
 			if (vkCreateSampler(device, &samplerInfo, nullptr, &outTexture.sampler) != VK_SUCCESS) 
 			{
