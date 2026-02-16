@@ -204,8 +204,8 @@ void Renderer::Draw()
 	gpuAvailable = false;
 
 	// Try to find a frame that is ready to be used (fence is signaled)
-	//for (int i = 0; i < 240; i++)
-	while (true)
+	//while (true)
+	for (int i = 0; i < 240; i++)
 	{
 		if (vkGetFenceStatus(vkContext.device, frames[selectedFrameBuf].renderFence) == VK_SUCCESS)
 		{
@@ -356,7 +356,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 	// --- Draw Objects ---
 	// Just a simple rotation effect based on time for demonstration
 	float rotationTimer = frameTimer->GetTimePassed();
-	rotationTimer = (rotationTimer * 1020.f) * 0.0002777778 + 240.f;
+	rotationTimer = (rotationTimer * 3000000.f) * 0.0002777778 + 240.f;
 	if (!renderables.empty())
 	{
 		int i = 0;
@@ -364,7 +364,7 @@ void Renderer::RecordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t image
 		{
 			if (!renderable.IsValid()) continue;
 
-			// NEW: Bind Set 1 (The texture/material)
+			// Bind Set 1 (The texture/material)
 			// We assume the materialSet has already been allocated and written to before getting here
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline.GetPipelineLayout(), 1, 1, &renderable.material->materialSet, 0, nullptr);
 

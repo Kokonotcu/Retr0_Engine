@@ -23,6 +23,22 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 
+//GPU-Driven Rendering
+//If you want to achieve the maximum possible performance in your engine, the next logical step after Bindless Materials is Multi - Draw Indirect(MDI) combined with Compute Culling.
+//
+//Here is how the ultimate pipeline works :
+// 
+//Materials: Bindless Textures + Material buffer SSBOs
+//
+//The Object Buffer(SSBO) : Just like you made an SSBO for Materials, you make one massive SSBO for Objects.It holds the Transform Matrix and Material ID for every object in your entire game world.
+//
+//The Indirect Buffer : You create a special Vulkan buffer that holds the raw hardware instructions for drawing(Index Count, First Index, Vertex Offset, etc.).
+//
+//Compute Shader Culling(The Magic) : At the start of the frame, you run a Compute Shader.The GPU looks at every object in the Object SSBO, checks if it is inside the camera's view frustum, and if it is, the GPU writes a draw command into the Indirect Buffer.
+//
+//One Draw Call : On the CPU, you no longer have a for loop.You make exactly one API call for the entire scene :
+//vkCmdDrawIndexedIndirect(commandBuffer, indirectBuffer, ...)
+
 
 // A simple container for the core Vulkan handles that almost every system needs
 struct VulkanContext 
