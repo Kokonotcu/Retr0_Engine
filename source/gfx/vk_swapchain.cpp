@@ -25,7 +25,7 @@ void Swapchain::CreateSwapchain(uint32_t width, uint32_t height, bool Vsync)
         //use vsync present mode
         .set_desired_present_mode(Vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR)
         .set_desired_extent(width, height)
-        .set_desired_min_image_count(4) // Sets the size of buffering (either triple or double is recommended and also change FRAME_OVERLAP in engine.h)
+        .set_desired_min_image_count(3) // Sets the size of buffering (either triple or double is recommended and also change FRAME_OVERLAP in engine.h)
         .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
         .build();
 
