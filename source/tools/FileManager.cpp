@@ -448,7 +448,7 @@ namespace FileManager
 			}
 
 			VkDeviceSize imageSize = texWidth * texHeight * 4;
-			uint32_t mipLevels = static_cast<uint32_t>(std::max((int)(std::floor(std::log2(std::max(texWidth, texHeight)))/5.0f), 1));
+			uint32_t mipLevels = static_cast<uint32_t>((std::floor(std::log2(std::max(texWidth, texHeight)))));
 
 			// 2. Create Staging Buffer (Upload Buffer)
 			VkBufferCreateInfo bufferInfo = {};
